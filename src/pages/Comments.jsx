@@ -140,7 +140,7 @@ const Comments = ({ postId }) => {
   return (
     <div style={{ 
         maxWidth: "960px",
-        maxHeight: "400px",
+        maxHeight: "800px",
         margin: "2rem auto",
         overflowY: "auto",
         backgroundColor: "#f8f9fa",
