@@ -5,6 +5,7 @@ import axios from "axios";
 import api from "../lib/api";
 
 function Login() {
+  console.log("API Base URL:", import.meta.env.VITE_API_BASE_URL);
   const [userId, setUserId] = useState("");
   const navigate = useNavigate();
 
