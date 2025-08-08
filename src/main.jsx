@@ -8,3 +8,5 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+console.log("API Base URL:", import.meta.env.VITE_API_BASE_URL);

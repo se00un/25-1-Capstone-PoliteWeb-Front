@@ -17,12 +17,11 @@ const IntroPage = () => {
                 overflowY: "auto",
                 }}>
       <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#030608ff"}}>
-         욕설 순화 시스템 실험 안내
+         순화 시스템 실험 안내
       </h1>
 
       <p style={{ lineHeight: "1.6", marginBottom: "1rem" }}>
         이 웹사이트는 <strong>온라인 커뮤니케이션 환경 개선</strong>을 위한 실험용 시스템입니다. <br />
-        참여자는 댓글을 자유롭게 작성하며 <strong>표현 방식, 감정 표현</strong>을 분석하는 연구에 기여하게 됩니다.
       </p>
 
       <h2 style={{ fontSize: "1.2rem", marginTop: "2rem" }}>⚠️ 이용 안내</h2>
