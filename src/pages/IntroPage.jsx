@@ -17,7 +17,7 @@ const IntroPage = () => {
                 overflowY: "auto",
                 }}>
       <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#030608ff"}}>
-         순화 시스템 실험 안내
+          온라인 커뮤니케이션 환경 개선을 위한 사용자 반응 기반 시스템 분석 실험 안내
       </h1>
 
       <p style={{ lineHeight: "1.6", marginBottom: "1rem" }}>
