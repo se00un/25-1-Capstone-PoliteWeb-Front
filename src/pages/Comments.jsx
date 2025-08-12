@@ -31,6 +31,16 @@ const Comments = ({ postId }) => {
     if (postId) fetchComments();
   }, [postId]);
 
+  useEffect(() => {
+    const onFocus = () => {
+      if (postId) fetchComments();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [postId]);
+
   const fetchComments = async () => {
     try {
       const res = await api.get(`/comments/${postId}`);
