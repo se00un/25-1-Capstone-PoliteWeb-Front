@@ -66,7 +66,7 @@ export default function CommentItem({
     
         {normDepth === 1 && (comment.reply_to_user || comment.parent_user_id) && (
           <div style={{ fontSize: "12px", color: "#888", marginBottom: 2 }}>
-            ↪︎ @{comment.reply_to_user || comment.parent_user_id}
+            ㄴ @{comment.reply_to_user || comment.parent_user_id}
           </div>
         )}
 
