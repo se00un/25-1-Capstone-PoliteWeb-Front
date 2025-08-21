@@ -1,187 +1,116 @@
 // Polite_Web-front/src/components/CommentItem.jsx
 
-import React, { useEffect, useState } from "react";
-import CommentBox from "../components/CommentBox";
-import PopupModal from "../components/PopupModal";
-import CommentItem from "../components/CommentItem";
+import React from "react";
 import api from "../lib/api";
 
-const Comments = ({ postId, section }) => {
-  const [userId, setUserId] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [comments, setComments] = useState([]);
-
-  const [replyTargetId, setReplyTargetId] = useState(null);
-  const [replyNickname, setReplyNickname] = useState("");
-
-  const [showModal, setShowModal] = useState(false);
-  const [modalData, setModalData] = useState({
-    original: "",
-    polite: "",
-    logit_original: null,
-    logit_polite: null,
-    selected_version: "original",
-  });
-
-  useEffect(() => {
-    const storedId = localStorage.getItem("userId") || "";
-    setUserId(storedId);
-  }, []);
-
-  useEffect(() => {
-    if (postId && section) fetchComments();
-  }, [postId, section]);
-
-  useEffect(() => {
-    const onFocus = () => {
-      if (postId && section) fetchComments();
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [postId, section]);
-
-  const fetchComments = async () => {
-    try {
-      const res = await api.get(`/comments/${postId}`, { params: { section } });
-      setComments(Array.isArray(res.data) ? res.data : []);
-    } catch (error) {
-      console.error("댓글 불러오기 실패:", error);
-    }
-  };
-
-  // (서버는 평탄 배열을 주므로, 대댓글 트리 구성)
-  const buildCommentTree = (flat) => {
-    const map = {};
-    const roots = [];
-    flat.forEach((c) => (map[c.id] = { ...c, replies: [], depth: 0 }));
-    flat.forEach((c) => {
-      if (c.reply_to) {
-        const p = map[c.reply_to];
-        if (p) {
-          map[c.id].depth = p.depth + 1;
-          p.replies.push(map[c.id]);
-        } else {
-          roots.push(map[c.id]); // 부모를 못 찾으면 루트로
-        }
-      } else {
-        roots.push(map[c.id]);
-      }
+const formattedDate = (timestamp) => {
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date)) return "";
+    return date.toLocaleString("ko-KR", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-    const sortByDate = (a, b) => new Date(a.created_at) - new Date(b.created_at);
-    const dfsSort = (list) => {
-      list.sort(sortByDate);
-      list.forEach((x) => x.replies?.length && dfsSort(x.replies));
-    };
-    dfsSort(roots);
-    return roots;
-  };
+  } catch {
+    return "";
+  }
+};
 
-  const startReply = (commentId, nickname) => {
-    setReplyTargetId(commentId);
-    setReplyNickname(nickname);
-    setInputValue(`@${nickname} `);
-  };
+export default function CommentItem({
+  comment,
+  startReply,
+  depth = 0,
+  currentUserId,
+  fetchComments,
+}) {
+  // 평탄 규칙: 원댓글=0, 그 외=1
+  const indentPx = depth > 0 ? 12 : 0;
+  const isTopLevel = depth === 0;
+  const canDelete = currentUserId && comment.user_id === currentUserId;
 
-  const handleFinalSubmit = async ({
-    original,
-    polite,
-    logit_original,
-    logit_polite,
-    selected_version,
-    reply_to = null,
-    is_modified = false,
-  }) => {
+  const handleDelete = async () => {
+    if (!confirm("댓글을 삭제할까요?")) return;
     try {
-      await api.post("/comments/add", {
-        user_id: userId,
-        post_id: postId,
-        section, // ✅ 섹션 필수
-        original,
-        polite,
-        logit_original,
-        logit_polite,
-        selected_version,
-        reply_to,
-        is_modified,
+      await api.delete(`/comments/${comment.id}`, {
+        data: { user_id: currentUserId },
       });
-      await fetchComments();
-      setInputValue("");
-      setReplyTargetId(null);
-      setReplyNickname("");
-    } catch (error) {
-      console.error("댓글 등록 실패:", error);
-      alert("댓글 등록 중 오류가 발생했습니다.");
+      await fetchComments?.();
+    } catch (e) {
+      console.error(e);
+      alert("삭제 중 오류가 발생했습니다.");
     }
   };
 
   return (
-    <div style={{ marginBottom: "2rem" }}>
-      <h3 style={{ margin: "0 0 .5rem" }}>섹션 {section} 댓글</h3>
-
+    <>
       <div
         style={{
-          maxHeight: "400px",
-          overflowY: "auto",
-          paddingRight: "10px",
-          border: "1px solid #444",
-          backgroundColor: "#fff",
-          marginBottom: "1rem",
-          borderRadius: "6px",
+          marginLeft: `${indentPx}px`,
+          marginTop: depth > 0 ? "4px" : "3px",
+          backgroundColor: isTopLevel ? "#fff" : "#f5f5f5",
+          padding: "10px 12px",
+          borderRadius: "8px",
+          marginBottom: "5px",
+          lineHeight: "1.4",
+          fontSize: "15px",
+          boxShadow: isTopLevel ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+          border: depth > 0 ? "1px solid #eee" : "none",
+          width: "100%",
+          maxWidth: "100%",
         }}
       >
-        {buildCommentTree(comments).map((comment) => (
+
+        {depth > 0 && (comment.reply_to_user || comment.parent_user_id) && (
+          <div style={{ fontSize: "13px", color: "#555", marginBottom: 2 }}>
+            <span aria-hidden="true" style={{ display: "inline-block", width: "1em", fontWeight: 700 }}>
+              {"\u2514"}{/* └ 또는 "\u3134" */}
+            </span>
+            @{comment.reply_to_user || comment.parent_user_id}
+          </div>
+        )}
+
+        <p style={{ margin: 0 }}>
+          <strong>{comment.user_id || "익명"}:</strong>{" "}
+          {(comment.selected_version === "polite" ? comment.polite : comment.original) || ""}
+        </p>
+
+        <p style={{ fontSize: "0.75rem", color: "#aaa", marginTop: 4, marginBottom: 0 }}>
+          {formattedDate(comment.created_at)}{" "}
+          <span
+            style={{ cursor: "pointer", color: "#999", marginLeft: "1rem" }}
+            onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
+          >
+            답글쓰기
+          </span>
+          {canDelete && (
+            <span
+              style={{ cursor: "pointer", color: "#c00", marginLeft: "1rem", fontWeight: 600 }}
+              onClick={handleDelete}
+              aria-label="댓글 삭제"
+              title="댓글 삭제"
+            >
+              삭제
+            </span>
+          )}
+        </p>
+      </div>
+
+      {comment.replies &&
+        comment.replies.length > 0 &&
+        comment.replies.map((reply) => (
           <CommentItem
-            key={comment.id}
-            comment={comment}
+            key={reply.id}
+            comment={reply}
             startReply={startReply}
-            depth={comment.depth > 0 ? 1 : 0} // ✅ 모든 대댓글 동일 들여쓰기(평탄)
-            currentUserId={userId}
+            depth={1}
+            currentUserId={currentUserId}
             fetchComments={fetchComments}
           />
         ))}
-      </div>
-
-      <CommentBox
-        userId={userId}
-        postId={postId}
-        inputValue={inputValue}
-        setInputValue={setInputValue}
-        onFinalSubmit={handleFinalSubmit} // ✅ 내부에서 section 포함해 POST
-        setShowModal={setShowModal}
-        setModalData={setModalData}
-        replyTargetId={replyTargetId}
-        setReplyTargetId={setReplyTargetId}
-        replyNickname={replyNickname}
-      />
-
-      {showModal && (
-        <PopupModal
-          original={modalData.original}
-          suggested={modalData.polite}
-          onAccept={() =>
-            handleFinalSubmit({
-              original: modalData.original,
-              polite: modalData.polite,
-              logit_original: modalData.logit_original,
-              logit_polite: modalData.logit_polite,
-              selected_version: "polite",
-              reply_to: replyTargetId,
-            })
-          }
-          onReject={() =>
-            handleFinalSubmit({
-              original: modalData.original,
-              polite: modalData.polite,
-              logit_original: modalData.logit_original,
-              logit_polite: modalData.logit_polite,
-              selected_version: "original",
-              reply_to: replyTargetId,
-            })
-          }
-        />
-      )}
-    </div>
+    </>
   );
-};
-
-export default Comments;
+}
