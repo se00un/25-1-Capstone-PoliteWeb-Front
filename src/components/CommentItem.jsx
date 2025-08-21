@@ -26,10 +26,10 @@ export default function CommentItem({
   currentUserId,
   fetchComments,
 }) {
+  const normDepth = depth > 0 ? 1 : 0;
+  const indentPx = normDepth === 1 ? 12 : 0;
 
-  const indentPx = depth > 0 ? 12 : 0;
-
-  const isTopLevel = depth === 0;
+  const isTopLevel = normDepth === 0;
   const canDelete = currentUserId && comment.user_id === currentUserId;
 
   const handleDelete = async () => {
@@ -46,52 +46,56 @@ export default function CommentItem({
   };
 
   return (
-    <div
-      style={{
-        marginLeft: `${indentPx}px`,
-        marginTop: depth > 0 ? "4px" : "3px",
-        backgroundColor: isTopLevel ? "#fff" : "#f5f5f5",
-        padding: "10px 12px",
-        borderRadius: "8px",
-        marginBottom: "5px",
-        lineHeight: "1.4",
-        fontSize: "15px",
-        boxShadow: isTopLevel ? "0 1px 2px rgba(0, 0, 0, 0.04)" : "none",
-        border: depth > 0 ? "1px solid #eee" : "none",
-        maxWidth: "90%",
-      }}
-    >
-
-      {depth > 0 && (comment.reply_to_user || comment.parent_user_id) && (
-        <div style={{ fontSize: "12px", color: "#888", marginBottom: 2 }}>
-          ↪︎ @{comment.reply_to_user || comment.parent_user_id}
-        </div>
-      )}
-
-      <p style={{ margin: 0 }}>
-        <strong>{comment.user_id || "익명"}:</strong>{" "}
-        {(comment.selected_version === "polite" ? comment.polite : comment.original) || ""}
-      </p>
-
-      <p style={{ fontSize: "0.75rem", color: "#aaa", marginTop: 4, marginBottom: 0 }}>
-        {formattedDate(comment.created_at)}{" "}
-        <span
-          style={{ cursor: "pointer", color: "#999", marginLeft: "1rem" }}
-          onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
-        >
-          답글쓰기
-        </span>
-        {canDelete && (
-          <span
-            style={{ cursor: "pointer", color: "#c00", marginLeft: "1rem", fontWeight: 600 }}
-            onClick={handleDelete}
-            aria-label="댓글 삭제"
-            title="댓글 삭제"
-          >
-            삭제
-          </span>
+    <>
+      <div
+        style={{
+          marginLeft: `${indentPx}px`,
+          marginTop: normDepth > 0 ? "4px" : "3px",
+          backgroundColor: isTopLevel ? "#fff" : "#f5f5f5",
+          padding: "10px 12px",
+          borderRadius: "8px",
+          marginBottom: "5px",
+          lineHeight: "1.4",
+          fontSize: "15px",
+          boxShadow: isTopLevel ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+          border: normDepth === 1 ? "1px solid #eee" : "none",
+          width: "100%",             
+          maxWidth: "100%",           
+        }}
+      >
+    
+        {normDepth === 1 && (comment.reply_to_user || comment.parent_user_id) && (
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: 2 }}>
+            ↪︎ @{comment.reply_to_user || comment.parent_user_id}
+          </div>
         )}
-      </p>
+
+        <p style={{ margin: 0 }}>
+          <strong>{comment.user_id || "익명"}:</strong>{" "}
+          {(comment.selected_version === "polite" ? comment.polite : comment.original) || ""}
+        </p>
+
+        <p style={{ fontSize: "0.75rem", color: "#aaa", marginTop: 4, marginBottom: 0 }}>
+          {formattedDate(comment.created_at)}{" "}
+          <span
+            style={{ cursor: "pointer", color: "#999", marginLeft: "1rem" }}
+            onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
+          >
+            답글쓰기
+          </span>
+          {canDelete && (
+            <span
+              style={{ cursor: "pointer", color: "#c00", marginLeft: "1rem", fontWeight: 600 }}
+              onClick={handleDelete}
+              aria-label="댓글 삭제"
+              title="댓글 삭제"
+            >
+              삭제
+            </span>
+          )}
+        </p>
+      </div>
+
 
       {comment.replies &&
         comment.replies.length > 0 &&
@@ -100,11 +104,12 @@ export default function CommentItem({
             key={reply.id}
             comment={reply}
             startReply={startReply}
-            depth={1}
+            depth={1}                 
             currentUserId={currentUserId}
             fetchComments={fetchComments}
           />
         ))}
-    </div>
+    </>
   );
 }
+
