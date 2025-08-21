@@ -84,27 +84,37 @@ export default function CommentItem({
           />
 
           <div style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: "12.5px" }}>
-            <span
-              role="button"
-              tabIndex={0}
-              style={{ cursor: "pointer", color: "#777" }}
+            <button
+              type="button"
               onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
-              onKeyDown={(e) => e.key === "Enter" && startReply?.(comment.id, comment.user_id || "익명")}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#666",
+                cursor: "pointer",
+                padding: 0
+              }}
+              title="답글쓰기"
             >
               답글쓰기
-            </span>
+            </button>
+
             {canDelete && (
-              <span
-                role="button"
-                tabIndex={0}
-                style={{ cursor: "pointer", color: "#b33", fontWeight: 600 }}
+              <button
+                type="button"
                 onClick={handleDelete}
-                onKeyDown={(e) => e.key === "Enter" && handleDelete()}
-                aria-label="댓글 삭제"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#b33",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  padding: 0
+                }}
                 title="댓글 삭제"
               >
                 삭제
-              </span>
+              </button>
             )}
           </div>
         </div>
