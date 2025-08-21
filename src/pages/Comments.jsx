@@ -188,7 +188,7 @@ const Comments = ({ postId }) => {
             key={comment.id}
             comment={comment}
             startReply={startReply}
-            depth={comment.depth}
+            depth={comment.depth > 0 ? 1 : 0}
             currentUserId={userId}        // 본인 댓글만 삭제 노출
             fetchComments={fetchComments}  // 삭제 후 목록 갱신
           />
