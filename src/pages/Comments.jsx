@@ -1,3 +1,5 @@
+// Polite_Web-front/src/pages/Comments.jsx
+
 import React, { useEffect, useState } from "react";
 import CommentBox from "../components/CommentBox";
 import PopupModal from "../components/PopupModal";
@@ -24,7 +26,11 @@ const Comments = ({ postId, section }) => {
   const [selectedVersion, setSelectedVersion] = useState("original");
 
   useEffect(() => {
-    const storedId = localStorage.getItem("userId") || "";
+    let storedId = localStorage.getItem("userId");
+    if (!storedId) {
+      storedId = "u_" + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem("userId", storedId);
+    }
     setUserId(storedId);
   }, []);
 
@@ -35,16 +41,24 @@ const Comments = ({ postId, section }) => {
 
   useEffect(() => {
     const onFocus = () => {
-      const s = Number(section); 
+      const s = Number(section);
       if (postId && s) fetchComments(s);
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [postId, section]);
 
+
+  useEffect(() => {
+    const s = Number(section);
+    if (postId && s && userId) fetchComments(s);
+  }, [userId]);
+
   const fetchComments = async (s = Number(section)) => {
     try {
-      const res = await api.get(`/comments/${postId}`, { params: { section: s } });
+      const res = await api.get(`/comments/${postId}`, {
+        params: { section: s, viewer_user_id: userId },
+      });
       setComments(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error("댓글 불러오기 실패:", error);
@@ -60,7 +74,7 @@ const Comments = ({ postId, section }) => {
         const p = map[c.reply_to];
         if (p) {
           map[c.id].depth = p.depth + 1;
-          map[c.id].parent_user_id = p.user_id; 
+          map[c.id].parent_user_id = p.user_id;
           p.replies.push(map[c.id]);
         } else {
           roots.push(map[c.id]);
@@ -94,15 +108,15 @@ const Comments = ({ postId, section }) => {
     is_modified = false,
   }) => {
     try {
-      const s = Number(section); 
+      const s = Number(section);
       const finalVersion = selected_version || selectedVersion || "original";
 
       let payloadOriginal = original ?? "";
       let payloadPolite = polite ?? "";
       if (finalVersion === "polite") {
-        payloadPolite = inputValue;     
+        payloadPolite = inputValue;
       } else {
-        payloadOriginal = inputValue;  
+        payloadOriginal = inputValue;
       }
 
       await api.post("/comments/add", {
@@ -122,7 +136,7 @@ const Comments = ({ postId, section }) => {
       setInputValue("");
       setReplyTargetId(null);
       setReplyNickname("");
-      setSelectedVersion("original"); 
+      setSelectedVersion("original");
     } catch (error) {
       console.error("댓글 등록 실패:", error);
       alert("댓글 등록 중 오류가 발생했습니다.");
@@ -131,7 +145,7 @@ const Comments = ({ postId, section }) => {
 
   return (
     <div
-    className="comments-root"
+      className="comments-root"
       style={{
         marginBottom: "2rem",
         display: "block",
@@ -163,7 +177,7 @@ const Comments = ({ postId, section }) => {
             comment={comment}
             startReply={startReply}
             depth={comment.depth > 0 ? 1 : 0}
-            currentUserId={userId}
+            currentUserId={userId}          
             fetchComments={fetchComments}
           />
         ))}

@@ -22,21 +22,23 @@ const formattedDate = (timestamp) => {
 
 export default function CommentItem({
   comment,
-  currentUserId,
+  currentUserId,  
   startReply,
   fetchComments,
   depth = 0,
 }) {
   const indentPx = depth > 0 ? 12 : 0;
   const isTopLevel = depth === 0;
-  const canDelete = !!currentUserId && comment.user_id === currentUserId;
+
+  // 삭제 권한 판정(공백 등 정규화)
+  const me = String(currentUserId ?? "").trim();
+  const author = String(comment.user_id ?? "").trim();
+  const canDelete = !!me && !!author && me === author;
 
   const handleDelete = async () => {
     if (!confirm("댓글을 삭제할까요?")) return;
     try {
-      await api.delete(`/comments/${comment.id}`, {
-        data: { user_id: currentUserId },
-      });
+      await api.delete(`/comments/${comment.id}`, { data: { user_id: currentUserId } });
       await fetchComments?.();
     } catch (e) {
       console.error(e);
@@ -63,16 +65,33 @@ export default function CommentItem({
   return (
     <>
       <div style={containerStyle}>
+        {/* 상단 메타: 번호 · 작성시각 */}
         <div style={{ fontSize: "12px", color: "#888", marginBottom: 4 }}>
-          #{comment.id} · {comment.user_id || "익명"} · {formattedDate(comment.created_at)}
+          #{comment.id} · {formattedDate(comment.created_at)}
         </div>
 
-        <div style={{ marginBottom: 8, color: "#222" }}>
-          {(comment.selected_version === "polite" ? comment.polite : comment.original) ??
-            comment.content ??
-            ""}
+        {/* 본문: "별명:" 라벨 -> 닉네임 -> · -> 내용 */}
+        <div
+          style={{
+            marginBottom: 8,
+            color: "#222",
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            alignItems: "baseline",
+          }}
+        >
+          <span style={{ color: "#666" }}>별명:</span>
+          <strong style={{ color: "#333" }}>{author || "익명"}</strong>
+          <span style={{ color: "#999" }}>·</span>
+          <span style={{ whiteSpace: "pre-wrap" }}>
+            {(comment.selected_version === "polite" ? comment.polite : comment.original) ??
+              comment.content ??
+              ""}
+          </span>
         </div>
 
+        {/* 액션 바: 좌측 반응 · 우측 답글/삭제 */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ReactionButtons
             commentId={comment.id}
@@ -86,14 +105,8 @@ export default function CommentItem({
           <div style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: "12.5px" }}>
             <button
               type="button"
-              onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "#666",
-                cursor: "pointer",
-                padding: 0
-              }}
+              onClick={() => startReply?.(comment.id, author || "익명")}
+              style={{ border: "none", background: "transparent", color: "#666", cursor: "pointer", padding: 0 }}
               title="답글쓰기"
             >
               답글쓰기
@@ -109,7 +122,7 @@ export default function CommentItem({
                   color: "#b33",
                   fontWeight: 600,
                   cursor: "pointer",
-                  padding: 0
+                  padding: 0,
                 }}
                 title="댓글 삭제"
               >
@@ -120,8 +133,8 @@ export default function CommentItem({
         </div>
       </div>
 
-      {comment.replies &&
-        comment.replies.length > 0 &&
+      {/* 대댓글 재귀 */}
+      {comment.replies?.length > 0 &&
         comment.replies.map((reply) => (
           <CommentItem
             key={reply.id}
