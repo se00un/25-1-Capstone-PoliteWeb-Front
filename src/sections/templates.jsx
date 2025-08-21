@@ -8,7 +8,7 @@ export const sectionTemplates = {
       <>
         <p>섹션 1에서 해야 할 안내/지침을 적습니다.</p>
         <img
-          src="/images/section1.png"  
+          src="/images/section1.png"  // public/images/section1.png
           alt="섹션1 안내"
           style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
         />
