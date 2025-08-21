@@ -130,11 +130,22 @@ const Comments = ({ postId, section }) => {
   };
 
   return (
-    <div style={{ marginBottom: "2rem" }}>
+    <div
+      style={{
+        marginBottom: "2rem",
+        display: "block",
+        width: "100%",
+        flex: "1 1 0%",
+        alignSelf: "stretch",
+        minWidth: 0,
+      }}
+      className="comments-root"
+    >
       <h3 style={{ margin: "0 0 .5rem" }}>섹션 {section} 댓글</h3>
 
       <div
         style={{
+          width: "100%",
           maxHeight: "400px",
           overflowY: "auto",
           paddingRight: "10px",
@@ -142,7 +153,6 @@ const Comments = ({ postId, section }) => {
           backgroundColor: "#fff",
           marginBottom: "1rem",
           borderRadius: "6px",
-          width: "100%",
           boxSizing: "border-box",
         }}
       >
