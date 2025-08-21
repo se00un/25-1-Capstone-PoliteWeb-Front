@@ -1,5 +1,4 @@
 // Polite_Web-front/src/components/CommentItem.jsx
-
 import React from "react";
 import api from "../lib/api";
 import ReactionButtons from "./ReactionButtons";
@@ -21,37 +20,16 @@ const formattedDate = (timestamp) => {
   }
 };
 
-export default function CommentItem({ comment, userId }) {
-  return (
-    <div className="p-3 border rounded mb-2">
-      <div className="text-sm opacity-80 mb-1">
-        #{comment.id} · {comment.user_id || "anonymous"}
-      </div>
-      <div className="mb-2">{comment.original ?? comment.content}</div>
-
-      <ReactionButtons
-        commentId={comment.id}
-        userId={userId}
-        initialLikeCount={comment.like_count}
-        initialHateCount={comment.hate_count}
-        initialLikedByMe={comment.liked_by_me}
-        initialHatedByMe={comment.hated_by_me}
-      />
-    </div>
-  );
-}
-
-
 export default function CommentItem({
   comment,
-  startReply,
-  depth = 0,
   currentUserId,
+  startReply,
   fetchComments,
+  depth = 0,
 }) {
   const indentPx = depth > 0 ? 12 : 0;
   const isTopLevel = depth === 0;
-  const canDelete = currentUserId && comment.user_id === currentUserId;
+  const canDelete = !!currentUserId && comment.user_id === currentUserId;
 
   const handleDelete = async () => {
     if (!confirm("댓글을 삭제할까요?")) return;
@@ -66,59 +44,70 @@ export default function CommentItem({
     }
   };
 
+  const containerStyle = {
+    marginLeft: `${indentPx}px`,
+    marginTop: depth > 0 ? "4px" : "3px",
+    backgroundColor: isTopLevel ? "#fff" : "#f5f5f5",
+    padding: "10px 12px",
+    borderRadius: "8px",
+    marginBottom: "6px",
+    lineHeight: "1.45",
+    fontSize: "15px",
+    boxShadow: isTopLevel ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+    border: depth > 0 ? "1px solid #eee" : "1px solid #e9e9e9",
+    width: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+  };
+
   return (
     <>
-      <div
-        style={{
-          marginLeft: `${indentPx}px`,
-          marginTop: depth > 0 ? "4px" : "3px",
-          backgroundColor: isTopLevel ? "#fff" : "#f5f5f5",
-          padding: "10px 12px",
-          borderRadius: "8px",
-          marginBottom: "5px",
-          lineHeight: "1.4",
-          fontSize: "15px",
-          boxShadow: isTopLevel ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-          border: depth > 0 ? "1px solid #eee" : "none",
-          width: "100%",
-          maxWidth: "100%",
-          boxSizing: "border-box", 
-        }}
-      >
+      <div style={containerStyle}>
+        <div style={{ fontSize: "12px", color: "#888", marginBottom: 4 }}>
+          #{comment.id} · {comment.user_id || "익명"} · {formattedDate(comment.created_at)}
+        </div>
 
-        {depth > 0 && (comment.reply_to_user || comment.parent_user_id) && (
-          <div style={{ fontSize: "13px", color: "#555", marginBottom: 2 }}>
-            <span aria-hidden="true" style={{ display: "inline-block", width: "1em", fontWeight: 700 }}>
-              {"\u2514"}{/* └ 또는 "\u3134" */}
-            </span>
-            @{comment.reply_to_user || comment.parent_user_id}
-          </div>
-        )}
+        <div style={{ marginBottom: 8, color: "#222" }}>
+          {(comment.selected_version === "polite" ? comment.polite : comment.original) ??
+            comment.content ??
+            ""}
+        </div>
 
-        <p style={{ margin: 0 }}>
-          <strong>{comment.user_id || "익명"}:</strong>{" "}
-          {(comment.selected_version === "polite" ? comment.polite : comment.original) || ""}
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ReactionButtons
+            commentId={comment.id}
+            userId={currentUserId}
+            initialLikeCount={comment.like_count ?? 0}
+            initialHateCount={comment.hate_count ?? 0}
+            initialLikedByMe={comment.liked_by_me ?? false}
+            initialHatedByMe={comment.hated_by_me ?? false}
+          />
 
-        <p style={{ fontSize: "0.75rem", color: "#aaa", marginTop: 4, marginBottom: 0 }}>
-          {formattedDate(comment.created_at)}{" "}
-          <span
-            style={{ cursor: "pointer", color: "#999", marginLeft: "1rem" }}
-            onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
-          >
-            답글쓰기
-          </span>
-          {canDelete && (
+          <div style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: "12.5px" }}>
             <span
-              style={{ cursor: "pointer", color: "#c00", marginLeft: "1rem", fontWeight: 600 }}
-              onClick={handleDelete}
-              aria-label="댓글 삭제"
-              title="댓글 삭제"
+              role="button"
+              tabIndex={0}
+              style={{ cursor: "pointer", color: "#777" }}
+              onClick={() => startReply?.(comment.id, comment.user_id || "익명")}
+              onKeyDown={(e) => e.key === "Enter" && startReply?.(comment.id, comment.user_id || "익명")}
             >
-              삭제
+              답글쓰기
             </span>
-          )}
-        </p>
+            {canDelete && (
+              <span
+                role="button"
+                tabIndex={0}
+                style={{ cursor: "pointer", color: "#b33", fontWeight: 600 }}
+                onClick={handleDelete}
+                onKeyDown={(e) => e.key === "Enter" && handleDelete()}
+                aria-label="댓글 삭제"
+                title="댓글 삭제"
+              >
+                삭제
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {comment.replies &&
@@ -127,10 +116,10 @@ export default function CommentItem({
           <CommentItem
             key={reply.id}
             comment={reply}
-            startReply={startReply}
-            depth={1}
             currentUserId={currentUserId}
+            startReply={startReply}
             fetchComments={fetchComments}
+            depth={1}
           />
         ))}
     </>
