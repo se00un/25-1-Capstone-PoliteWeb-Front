@@ -1,5 +1,3 @@
-// Polite_Web-front/src/pages/Comments.jsx
-
 import React, { useEffect, useState } from "react";
 import CommentBox from "../components/CommentBox";
 import PopupModal from "../components/PopupModal";
@@ -23,32 +21,35 @@ const Comments = ({ postId, section }) => {
     selected_version: "original",
   });
 
+  const [selectedVersion, setSelectedVersion] = useState("original");
+
   useEffect(() => {
     const storedId = localStorage.getItem("userId") || "";
     setUserId(storedId);
   }, []);
 
   useEffect(() => {
-    if (postId && section) fetchComments();
+    const s = Number(section);
+    if (postId && s) fetchComments(s);
   }, [postId, section]);
 
   useEffect(() => {
     const onFocus = () => {
-      if (postId && section) fetchComments();
+      const s = Number(section); 
+      if (postId && s) fetchComments(s);
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [postId, section]);
 
-  const fetchComments = async () => {
+  const fetchComments = async (s = Number(section)) => {
     try {
-      const res = await api.get(`/comments/${postId}`, { params: { section } });
+      const res = await api.get(`/comments/${postId}`, { params: { section: s } });
       setComments(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error("댓글 불러오기 실패:", error);
     }
   };
-
 
   const buildCommentTree = (flat) => {
     const map = {};
@@ -59,10 +60,10 @@ const Comments = ({ postId, section }) => {
         const p = map[c.reply_to];
         if (p) {
           map[c.id].depth = p.depth + 1;
-          map[c.id].parent_user_id = p.user_id;
+          map[c.id].parent_user_id = p.user_id; 
           p.replies.push(map[c.id]);
         } else {
-          roots.push(map[c.id]); 
+          roots.push(map[c.id]);
         }
       } else {
         roots.push(map[c.id]);
@@ -93,22 +94,35 @@ const Comments = ({ postId, section }) => {
     is_modified = false,
   }) => {
     try {
+      const s = Number(section); 
+      const finalVersion = selected_version || selectedVersion || "original";
+
+      let payloadOriginal = original ?? "";
+      let payloadPolite = polite ?? "";
+      if (finalVersion === "polite") {
+        payloadPolite = inputValue;     
+      } else {
+        payloadOriginal = inputValue;  
+      }
+
       await api.post("/comments/add", {
         user_id: userId,
         post_id: postId,
-        section, 
-        original,
-        polite,
+        section: s,
+        original: payloadOriginal,
+        polite: payloadPolite,
         logit_original,
         logit_polite,
-        selected_version,
+        selected_version: finalVersion,
         reply_to,
         is_modified,
       });
-      await fetchComments();
+
+      await fetchComments(s);
       setInputValue("");
       setReplyTargetId(null);
       setReplyNickname("");
+      setSelectedVersion("original"); 
     } catch (error) {
       console.error("댓글 등록 실패:", error);
       alert("댓글 등록 중 오류가 발생했습니다.");
@@ -137,7 +151,7 @@ const Comments = ({ postId, section }) => {
             key={comment.id}
             comment={comment}
             startReply={startReply}
-            depth={comment.depth > 0 ? 1 : 0} 
+            depth={comment.depth > 0 ? 1 : 0}
             currentUserId={userId}
             fetchComments={fetchComments}
           />
@@ -161,26 +175,17 @@ const Comments = ({ postId, section }) => {
         <PopupModal
           original={modalData.original}
           suggested={modalData.polite}
-          onAccept={() =>
-            handleFinalSubmit({
-              original: modalData.original,
-              polite: modalData.polite,
-              logit_original: modalData.logit_original,
-              logit_polite: modalData.logit_polite,
-              selected_version: "polite",
-              reply_to: replyTargetId,
-            })
-          }
-          onReject={() =>
-            handleFinalSubmit({
-              original: modalData.original,
-              polite: modalData.polite,
-              logit_original: modalData.logit_original,
-              logit_polite: modalData.logit_polite,
-              selected_version: "original",
-              reply_to: replyTargetId,
-            })
-          }
+          onAccept={() => {
+            setSelectedVersion("polite");
+            setInputValue(modalData.polite || "");
+            setShowModal(false);
+          }}
+          onReject={() => {
+            setSelectedVersion("original");
+            setInputValue(modalData.original || "");
+            setShowModal(false);
+          }}
+          onClose={() => setShowModal(false)}
         />
       )}
     </div>

@@ -33,17 +33,18 @@ const PopupModal = ({ original = "", suggested = "", onAccept, onReject, isRefin
         ) : (
           <>
             <h3>⚠️ 부정적 표현 및 욕설 감지됨!</h3>
+            
+            <p style={{ marginTop: "1rem" }}>
+              아래 문장은 <strong>공격적 표현</strong>을 포함하고 있으며, 타인에게 불쾌감을 주거나 
+              <em> 명예훼손 및 모욕죄</em>로 이어질 수 있습니다.
+              <br />
+              안전한 소통을 위해 <strong>아래 순화 문장</strong>으로 수정하시겠습니까?
+            </p>
             <p>
               <strong>사용자 입력:</strong> {original || "(입력 없음)"}
             </p>
             <p>
               <strong>순화 제안:</strong> {suggested}
-            </p>
-            <p style={{ marginTop: "1rem" }}>
-              이 문장은 <strong>공격적 표현</strong>을 포함하고 있으며, 타인에게 불쾌감을 주거나 
-              <em> 명예훼손 및 모욕죄</em>로 이어질 수 있습니다.
-              <br />
-              안전한 소통을 위해 <strong>아래 순화 문장</strong>으로 수정하시겠습니까?
             </p>
             <div style={buttonContainerStyle}>
               <button
@@ -59,6 +60,7 @@ const PopupModal = ({ original = "", suggested = "", onAccept, onReject, isRefin
               >
                 ✅ 순화된 문장 채택
               </button>
+
               <button
                 onClick={onReject}
                 style={{
