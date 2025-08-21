@@ -127,6 +127,8 @@ const Comments = ({ postId, section }) => {
           backgroundColor: "#fff",
           marginBottom: "1rem",
           borderRadius: "6px",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
         {buildCommentTree(comments).map((comment) => (
