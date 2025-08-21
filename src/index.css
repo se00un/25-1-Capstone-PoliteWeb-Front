@@ -79,3 +79,5 @@ body, html {
   color: #000 !important;
   font-family: sans-serif;
 }
+
+.section-panel { display: block !important; width: 100% !important; }

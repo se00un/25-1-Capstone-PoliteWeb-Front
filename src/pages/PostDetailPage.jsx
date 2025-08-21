@@ -49,39 +49,59 @@ function PostDetailPage() {
   const tpl = sectionTemplates[currentSection];
 
   return (
-    <div style={{
-      margin: "40px auto",
-      maxWidth: 960,
-      width: "100%",
-      boxSizing: "border-box"
-    }}>
-      <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{post.title}</h1>
+    <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+      <div
+        style={{
+          margin: "40px auto",
+          width: "100%",
+          maxWidth: 960,
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+        }}
+      >
+        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{post.title}</h1>
 
-      <SectionPicker
-        sections={subPosts.length ? subPosts : [1,2,3]}
-        value={currentSection}
-        onChange={setCurrentSection}
-      />
+        <SectionPicker
+          sections={subPosts.length ? subPosts : [1, 2, 3]}
+          value={currentSection}
+          onChange={setCurrentSection}
+        />
 
-      <div style={{
-        padding: "12px 14px",
-        border: "1px solid #E5E7EB",
-        borderRadius: 8,
-        background: "#FFFFFF",
-        marginBottom: 16,
-        width: "100%",
-        boxSizing: "border-box"
-      }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, marginBottom: 6 }}>
-          섹션 {currentSection}
-        </h2>
-        <div style={{ color: "#374151", whiteSpace: "pre-wrap" }}>
-          {currentSub?.content ?? "(내용 없음)"}
+        <div
+          style={{
+            padding: "12px 14px",
+            border: "1px solid #E5E7EB",
+            borderRadius: 8,
+            background: "#FFFFFF",
+            marginBottom: 16,
+            width: "100%",
+            boxSizing: "border-box",
+            display: "block",
+          }}
+        >
+          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, marginBottom: 6 }}>
+            섹션 {currentSection}
+          </h2>
+          <div style={{ color: "#374151", whiteSpace: "pre-wrap" }}>
+            {currentSub?.content ?? "(내용 없음)"}
+          </div>
         </div>
-      </div>
 
-      <div style={{ width: "100%", boxSizing: "border-box" }}>
-        <Comments postId={post.id} section={currentSection} />
+        <div
+          className="section-panel"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            display: "block",
+            flex: "1 1 0%",
+            alignSelf: "stretch",
+            minWidth: 0,
+          }}
+        >
+          <Comments postId={post.id} section={currentSection} />
+        </div>
       </div>
     </div>
   );
