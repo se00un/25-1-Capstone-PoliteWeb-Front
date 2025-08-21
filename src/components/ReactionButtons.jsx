@@ -40,11 +40,11 @@ export default function ReactionButtons({
     lastClickAt.current[type] = now;
 
     if (type === "like" && likedByMe && now - last <= doubleClickMs) {
-      openModal("이미 '좋아요'를 누르셨어요! 다시 누르면 취소됩니다.");
+      openModal("이미 '좋아요'를 누르셨어요!");
       return;
     }
     if (type === "hate" && hatedByMe && now - last <= doubleClickMs) {
-      openModal("이미 '싫어요'를 누르셨어요! 다시 누르면 취소됩니다.");
+      openModal("이미 '싫어요'를 누르셨어요!");
       return;
     }
 

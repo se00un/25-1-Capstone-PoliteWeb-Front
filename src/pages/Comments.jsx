@@ -48,7 +48,6 @@ const Comments = ({ postId, section }) => {
     return () => window.removeEventListener("focus", onFocus);
   }, [postId, section]);
 
-
   useEffect(() => {
     const s = Number(section);
     if (postId && s && userId) fetchComments(s);

@@ -22,7 +22,7 @@ const formattedDate = (timestamp) => {
 
 export default function CommentItem({
   comment,
-  currentUserId,  
+  currentUserId,   
   startReply,
   fetchComments,
   depth = 0,
@@ -30,10 +30,16 @@ export default function CommentItem({
   const indentPx = depth > 0 ? 12 : 0;
   const isTopLevel = depth === 0;
 
-  // 삭제 권한 판정(공백 등 정규화)
+  const nickname = String(comment.user_id ?? "").trim() || "익명";
+  const text =
+    (comment.selected_version === "polite" ? comment.polite : comment.original) ??
+    comment.content ??
+    "";
+
   const me = String(currentUserId ?? "").trim();
-  const author = String(comment.user_id ?? "").trim();
-  const canDelete = !!me && !!author && me === author;
+  const own = typeof comment.owned_by_me === "boolean"
+    ? comment.owned_by_me
+    : (me && nickname && me === nickname);
 
   const handleDelete = async () => {
     if (!confirm("댓글을 삭제할까요?")) return;
@@ -70,25 +76,10 @@ export default function CommentItem({
           #{comment.id} · {formattedDate(comment.created_at)}
         </div>
 
-        {/* 본문: "별명:" 라벨 -> 닉네임 -> · -> 내용 */}
-        <div
-          style={{
-            marginBottom: 8,
-            color: "#222",
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            alignItems: "baseline",
-          }}
-        >
-          <span style={{ color: "#666" }}>별명:</span>
-          <strong style={{ color: "#333" }}>{author || "익명"}</strong>
-          <span style={{ color: "#999" }}>·</span>
-          <span style={{ whiteSpace: "pre-wrap" }}>
-            {(comment.selected_version === "polite" ? comment.polite : comment.original) ??
-              comment.content ??
-              ""}
-          </span>
+        {/* 본문 -: "닉네임: 댓글" */}
+        <div style={{ marginBottom: 8, color: "#222", whiteSpace: "pre-wrap" }}>
+          <strong style={{ color: "#333" }}>{nickname}:</strong>{" "}
+          <span>{text}</span>
         </div>
 
         {/* 액션 바: 좌측 반응 · 우측 답글/삭제 */}
@@ -105,14 +96,14 @@ export default function CommentItem({
           <div style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: "12.5px" }}>
             <button
               type="button"
-              onClick={() => startReply?.(comment.id, author || "익명")}
+              onClick={() => startReply?.(comment.id, nickname)}
               style={{ border: "none", background: "transparent", color: "#666", cursor: "pointer", padding: 0 }}
               title="답글쓰기"
             >
               답글쓰기
             </button>
 
-            {canDelete && (
+            {own && (
               <button
                 type="button"
                 onClick={handleDelete}
