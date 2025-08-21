@@ -2,6 +2,7 @@
 
 import React from "react";
 import api from "../lib/api";
+import ReactionButtons from "./ReactionButtons";
 
 const formattedDate = (timestamp) => {
   try {
@@ -20,6 +21,27 @@ const formattedDate = (timestamp) => {
   }
 };
 
+export default function CommentItem({ comment, userId }) {
+  return (
+    <div className="p-3 border rounded mb-2">
+      <div className="text-sm opacity-80 mb-1">
+        #{comment.id} · {comment.user_id || "anonymous"}
+      </div>
+      <div className="mb-2">{comment.original ?? comment.content}</div>
+
+      <ReactionButtons
+        commentId={comment.id}
+        userId={userId}
+        initialLikeCount={comment.like_count}
+        initialHateCount={comment.hate_count}
+        initialLikedByMe={comment.liked_by_me}
+        initialHatedByMe={comment.hated_by_me}
+      />
+    </div>
+  );
+}
+
+
 export default function CommentItem({
   comment,
   startReply,
@@ -27,7 +49,6 @@ export default function CommentItem({
   currentUserId,
   fetchComments,
 }) {
-  // 평탄 규칙: 원댓글=0, 그 외=1
   const indentPx = depth > 0 ? 12 : 0;
   const isTopLevel = depth === 0;
   const canDelete = currentUserId && comment.user_id === currentUserId;
