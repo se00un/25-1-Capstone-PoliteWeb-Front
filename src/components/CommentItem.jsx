@@ -65,8 +65,11 @@ export default function CommentItem({
       >
     
         {normDepth === 1 && (comment.reply_to_user || comment.parent_user_id) && (
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: 2 }}>
-            ㄴ @{comment.reply_to_user || comment.parent_user_id}
+          <div style={{ fontSize: "14px", color: "#555", marginBottom: 2 }}>
+            <span className="reply-marker" aria-hidden="true" style={{ display: "inline-block", width: "1em", fontWeight: 700 }}>
+              {"\u2514"}{/* └ 또는 "\u3134" */}
+            </span>
+            @{comment.reply_to_user || comment.parent_user_id}
           </div>
         )}
 
