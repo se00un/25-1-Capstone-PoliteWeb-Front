@@ -59,6 +59,7 @@ const Comments = ({ postId, section }) => {
         const p = map[c.reply_to];
         if (p) {
           map[c.id].depth = p.depth + 1;
+          map[c.id].parent_user_id = p.user_id;
           p.replies.push(map[c.id]);
         } else {
           roots.push(map[c.id]); 

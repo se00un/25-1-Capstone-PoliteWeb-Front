@@ -61,6 +61,7 @@ export default function CommentItem({
           border: depth > 0 ? "1px solid #eee" : "none",
           width: "100%",
           maxWidth: "100%",
+          boxSizing: "border-box", 
         }}
       >
 
