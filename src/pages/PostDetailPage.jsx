@@ -49,7 +49,12 @@ function PostDetailPage() {
   const tpl = sectionTemplates[currentSection];
 
   return (
-    <div style={{ margin: "5%", maxWidth: 960 }}>
+    <div style={{
+      margin: "40px auto",
+      maxWidth: 960,
+      width: "100%",
+      boxSizing: "border-box"
+    }}>
       <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{post.title}</h1>
 
       <SectionPicker
@@ -58,20 +63,26 @@ function PostDetailPage() {
         onChange={setCurrentSection}
       />
 
-      <div style={{ padding: "12px 14px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", marginBottom: 16 }}>
+      <div style={{
+        padding: "12px 14px",
+        border: "1px solid #E5E7EB",
+        borderRadius: 8,
+        background: "#FFFFFF",
+        marginBottom: 16,
+        width: "100%",
+        boxSizing: "border-box"
+      }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, marginBottom: 6 }}>
-          {`섹션 ${currentSection}`} {tpl?.title && !currentSub?.content ? `· ${tpl.title}` : ""}
+          섹션 {currentSection}
         </h2>
-
-        <div style={{ color: "#374151" }}>
-          {currentSub?.content
-            ? <div style={{ whiteSpace: "pre-wrap" }}>{currentSub.content}</div> 
-            : tpl?.content || <span style={{ color: "#9ca3af" }}>(내용 없음)</span>  
-          }
+        <div style={{ color: "#374151", whiteSpace: "pre-wrap" }}>
+          {currentSub?.content ?? "(내용 없음)"}
         </div>
       </div>
 
-      <Comments postId={post.id} section={currentSection} />
+      <div style={{ width: "100%", boxSizing: "border-box" }}>
+        <Comments postId={post.id} section={currentSection} />
+      </div>
     </div>
   );
 }
