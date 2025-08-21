@@ -131,6 +131,7 @@ const Comments = ({ postId, section }) => {
 
   return (
     <div
+    className="comments-root"
       style={{
         marginBottom: "2rem",
         display: "block",
@@ -139,14 +140,14 @@ const Comments = ({ postId, section }) => {
         alignSelf: "stretch",
         minWidth: 0,
       }}
-      className="comments-root"
     >
       <h3 style={{ margin: "0 0 .5rem" }}>섹션 {section} 댓글</h3>
 
       <div
+        className="comments-scroll"
         style={{
           width: "100%",
-          maxHeight: "400px",
+          maxHeight: "480px",
           overflowY: "auto",
           paddingRight: "10px",
           border: "1px solid #444",
