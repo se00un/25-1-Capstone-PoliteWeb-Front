@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router-dom";
 import api from "../lib/api";
 import Comments from "./Comments";
 import SectionPicker from "../components/SectionPicker";
+import { sectionTemplates } from "../sections/templates";  
 
 function PostDetailPage() {
   const { id } = useParams();
@@ -45,29 +46,31 @@ function PostDetailPage() {
   if (!verified) return <p>비밀번호를 확인 중입니다...</p>;
   if (!post) return <p>로딩 중...</p>;
 
+  const tpl = sectionTemplates[currentSection];
+
   return (
     <div style={{ margin: "5%", maxWidth: 960 }}>
-      {/* 제목 */}
       <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{post.title}</h1>
 
-      {/* 섹션 선택 */}
       <SectionPicker
         sections={subPosts.length ? subPosts : [1,2,3]}
         value={currentSection}
         onChange={setCurrentSection}
       />
 
-      {/* 선택된 섹션 본문 */}
       <div style={{ padding: "12px 14px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", marginBottom: 16 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, marginBottom: 6 }}>
-          섹션 {currentSection}
+          {`섹션 ${currentSection}`} {tpl?.title && !currentSub?.content ? `· ${tpl.title}` : ""}
         </h2>
-        <div style={{ color: "#374151", whiteSpace: "pre-wrap" }}>
-          {currentSub?.content ?? "(내용 없음)"}
+
+        <div style={{ color: "#374151" }}>
+          {currentSub?.content
+            ? <div style={{ whiteSpace: "pre-wrap" }}>{currentSub.content}</div> 
+            : tpl?.content || <span style={{ color: "#9ca3af" }}>(내용 없음)</span>  
+          }
         </div>
       </div>
 
-      {/* 선택된 섹션의 댓글 */}
       <Comments postId={post.id} section={currentSection} />
     </div>
   );
