@@ -7,9 +7,9 @@ export const sectionTemplates = {
     content: (
       <>
         <h2> 한 디시인의 여성혐오에 대한 의견</h2>
-        <p> </p>
+        <p></p>
         <img
-          src="/images/section1.png"  // public/images/section1.png
+          src="/images/section1.png"
           alt="섹션1 안내"
           style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
         />
@@ -25,24 +25,22 @@ export const sectionTemplates = {
           올여름 최대 기대작 영화 ‘전지적 독자 시점(전독시)’이 7월 23일 개봉을 앞두고
           시사회를 통해 먼저 공개됐다.
         </p>
-
         <p>
           원작 팬덤이 크고 기대가 컸던 만큼 관심이 쏠렸지만, 배우 지수의 연기에는
           압도적인 혹평이 쏟아졌다. 일부 평론가는 “분량은 5분인데도 연기 논란이 나온 건
           오히려 영향력이 크다는 증거”라고 평가했다.
         </p>
-
         <p>
           김병우 감독은 “지수의 연기 지적은 알고 있다. 하지만 지수가 아니었다면
           주목받지 못했을 캐릭터다. 오히려 잘된 캐스팅”이라고 말했다.
         </p>
-
         <p>
           지수는 극 중 ‘유중혁’(이민호)을 따르는 미스터리한 여고생으로 등장하며,
           후속작이 제작된다면 비중이 커질 예정이다.
         </p>
         <img
           src="/assets/Section2.jpeg"
+          alt="섹션2 예시"
           style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
         />
       </>
@@ -63,7 +61,7 @@ export const sectionTemplates = {
           과도한 손해배상 청구로 노동권이 위축되지 않도록 제한한 것입니다.
         </p>
         <img
-          src="/assets/Section3.png"
+          src="/assets/Section3.png"  
           alt="섹션3 예시"
           style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
         />
@@ -71,3 +69,4 @@ export const sectionTemplates = {
     ),
   },
 };
+
