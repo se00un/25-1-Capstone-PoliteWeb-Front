@@ -31,7 +31,7 @@ const IntroPage = () => {
         <li>⌛️ 팝업 등장 시 <strong>최대 20초 정도의 시간이 소요</strong>되며, 이때 다른 곳을 클릭하지말고 <strong>기다려주세요!</strong></li>
         <li>👍 제안 문장은 <strong>수락/거절</strong> 모두 가능하며, 거절 시 원래 문장이 등록됩니다.</li>
         <li>✔️ 한 번 작성된 댓글은 <strong>수정</strong>이 불가능합니다.</li>
-        <li>✋ 반드시 <strong>9개 이상의 댓글을 각 섹션에 작성하셔야만 </strong> 실험 참여 보상을 받으실 수 있습니다.</li>
+        <li>✋ 반드시 <strong>9개 이상의 댓글을 각 섹션에 3개씩 작성하셔야만 </strong> 실험 참여 보상을 받으실 수 있습니다.</li>
       </ul>
 
       <h2 style={{ fontSize: "1.2rem", marginTop: "2rem" }}>📷 팝업 예시</h2>
