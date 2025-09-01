@@ -1,58 +1,93 @@
-// Polite_Web-front/src/pages/PostDetailPage.jsx
-
-import React, { useEffect, useMemo, useState } from "react";
+// src/pages/PostDetailPage.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import api from "../lib/api";
 import Comments from "./Comments";
 import SectionPicker from "../components/SectionPicker";
 import { sectionTemplates } from "../sections/templates";
 
-function PostDetailPage() {
+/**
+ * PostDetailPage
+ * - 비밀번호 검증 후 Post / SubPost(섹션) 로드
+ * - 섹션 선택 UI(SectionPicker) + 템플릿 기반 본문 렌더
+ * - 섹션별 댓글 영역(Comments)
+**/
+
+export default function PostDetailPage() {
   const { id } = useParams();
-  const { state } = useLocation();
-
-  const [post, setPost] = useState(null);
-  const [subPosts, setSubPosts] = useState([]);     
+  const { state } = useLocation(); // { password }
+  const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
+  const [post, setPost] = useState(null);
+  const [subPosts, setSubPosts] = useState([]);
   const [currentSection, setCurrentSection] = useState(1);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!state?.password) return;
-    (async () => {
-      try {
-        const res = await api.post(`/posts/${id}/verify`, { password: state.password });
-        if (!res.data?.valid) {
-          alert("비밀번호가 틀렸습니다.");
-          return;
-        }
-        setVerified(true);
-        setPost(res.data.post);
-
-        const sps = Array.isArray(res.data.sub_posts) ? res.data.sub_posts : [];
-        sps.sort((a, b) => (a.ord ?? 0) - (b.ord ?? 0));
-        setSubPosts(sps);
-
-        const defOrd = sps.find(s => s.ord === 1)?.ord ?? sps[0]?.ord ?? 1;
-        setCurrentSection(defOrd);
-      } catch (e) {
-        console.error(e);
-        alert("게시글을 불러오는 중 오류가 발생했습니다.");
+  const load = useCallback(async () => {
+    if (!state?.password) {
+      setError("비밀번호 정보가 없습니다.");
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError("");
+      const res = await api.post(`/posts/${id}/verify`, { password: state.password });
+      if (!res?.data?.valid) {
+        setVerified(false);
+        setError("비밀번호가 틀렸습니다.");
+        setLoading(false);
+        return;
       }
-    })();
+
+      const postData = res.data.post ?? null;
+      const sps = Array.isArray(res.data.sub_posts) ? [...res.data.sub_posts] : [];
+      sps.sort((a, b) => (a.ord ?? 0) - (b.ord ?? 0));
+
+      setVerified(true);
+      setPost(postData);
+      setSubPosts(sps);
+
+      const defOrd = sps.find((s) => s.ord === 1)?.ord ?? sps[0]?.ord ?? 1;
+      setCurrentSection(defOrd);
+    } catch (e) {
+      setError(e?.message || "게시글을 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
   }, [id, state]);
 
+  useEffect(() => {
+    load();
+  }, [load]);
 
+  // 섹션 목록 
   const sectionNumbers = useMemo(() => {
     if (subPosts.length) {
-      return subPosts.map(sp => sp.ord).filter(n => Number.isFinite(n));
+      return subPosts
+        .map((sp) => sp?.ord)
+        .filter((n) => Number.isFinite(n))
+        .sort((a, b) => a - b);
     }
-    return Object.keys(sectionTemplates).map(Number).sort((a, b) => a - b);
+    return Object.keys(sectionTemplates)
+      .map(Number)
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
   }, [subPosts]);
 
-  const tpl = sectionTemplates[Number(currentSection)];
+  const tpl = useMemo(() => sectionTemplates[Number(currentSection)], [currentSection]);
 
-  if (!verified) return <p>비밀번호를 확인 중입니다...</p>;
-  if (!post) return <p>로딩 중...</p>;
+  // 현재 섹션이 목록에 없으면 첫 섹션으로 보정
+  useEffect(() => {
+    if (!sectionNumbers.length) return;
+    if (!sectionNumbers.includes(Number(currentSection))) {
+      setCurrentSection(sectionNumbers[0]);
+    }
+  }, [sectionNumbers, currentSection]);
+
+  if (loading) return <p style={{ padding: 16 }}>로딩 중…</p>;
+  if (error && !verified) return <p style={{ padding: 16, color: "#DC2626" }}>{error}</p>;
+  if (!post) return <p style={{ padding: 16 }}>게시글 정보를 찾을 수 없습니다.</p>;
 
   return (
     <div
@@ -81,9 +116,9 @@ function PostDetailPage() {
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, marginBottom: 6 }}>
           {tpl?.title ?? `섹션 ${currentSection}`}
         </h2>
-
-        {tpl?.content ?? <p style={{ color: "#6B7280" }}>(템플릿 없음)</p>}
+        {tpl?.content ?? <p style={{ color: "#6B7280", margin: 0 }}>(템플릿 없음)</p>}
       </div>
+
 
       <div className="section-panel" style={{ width: "100%", boxSizing: "border-box" }}>
         <Comments postId={post.id} section={currentSection} />
@@ -91,6 +126,3 @@ function PostDetailPage() {
     </div>
   );
 }
-
-export default PostDetailPage;
-

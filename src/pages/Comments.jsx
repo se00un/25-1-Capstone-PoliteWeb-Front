@@ -1,152 +1,93 @@
-// Polite_Web-front/src/pages/Comments.jsx
-
-import React, { useEffect, useState } from "react";
+// src/pages/Comments.jsx
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CommentBox from "../components/CommentBox";
-import PopupModal from "../components/PopupModal";
 import CommentItem from "../components/CommentItem";
-import api from "../lib/api";
+import { fetchComments as apiFetchComments, deleteComment as apiDeleteComment } from "../lib/api";
 
-const Comments = ({ postId, section }) => {
+
+export default function Comments({ postId, section }) {
   const [userId, setUserId] = useState("");
-  const [inputValue, setInputValue] = useState("");
   const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const [replyTargetId, setReplyTargetId] = useState(null);
-  const [replyNickname, setReplyNickname] = useState("");
+  // 대댓글 상태
+  const [replyTarget, setReplyTarget] = useState(null); 
+  const replyInputRef = useRef(null);
 
-  const [showModal, setShowModal] = useState(false);
-  const [modalData, setModalData] = useState({
-    original: "",
-    polite: "",
-    logit_original: null,
-    logit_polite: null,
-    selected_version: "original",
-  });
-
-  const [selectedVersion, setSelectedVersion] = useState("original");
-
+  // userId 생성/로드
   useEffect(() => {
-    let storedId = localStorage.getItem("userId");
-    if (!storedId) {
-      storedId = "u_" + Math.random().toString(36).slice(2, 10);
-      localStorage.setItem("userId", storedId);
+    let stored = localStorage.getItem("userId");
+    if (!stored) {
+      stored = "u_" + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem("userId", stored);
     }
-    setUserId(storedId);
+    setUserId(stored);
   }, []);
 
-  useEffect(() => {
-    const s = Number(section);
-    if (postId && s) fetchComments(s);
+  // 목록 로드
+  const load = useCallback(async () => {
+    if (!postId || section == null) return;
+    try {
+      setLoading(true);
+      const data = await apiFetchComments({ postId, section, sort: "new", page: 1, limit: 200 });
+      const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+      setComments(rows);
+    } catch (e) {
+      console.warn("[Comments] fetch error:", e?.message || e);
+      setComments([]);
+    } finally {
+      setLoading(false);
+    }
   }, [postId, section]);
 
   useEffect(() => {
-    const onFocus = () => {
-      const s = Number(section);
-      if (postId && s) fetchComments(s);
-    };
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [postId, section]);
+  }, [load]);
 
-  useEffect(() => {
-    const s = Number(section);
-    if (postId && s && userId) fetchComments(s);
-  }, [userId]);
+  // 평면 → 트리
+  const tree = useMemo(() => buildCommentTree(comments), [comments]);
 
-  const fetchComments = async (s = Number(section)) => {
-    try {
-      const res = await api.get(`/comments/${postId}`, {
-        params: { section: s, viewer_user_id: userId },
-      });
-      setComments(Array.isArray(res.data) ? res.data : []);
-    } catch (error) {
-      console.error("댓글 불러오기 실패:", error);
-    }
-  };
+  // 대댓글 시작/취소
+  const startReply = useCallback((commentId, nickname) => {
+    setReplyTarget({ id: commentId, nickname: nickname || "" });
+    setTimeout(() => {
+      replyInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }, []);
+  const cancelReply = useCallback(() => setReplyTarget(null), []);
 
-  const buildCommentTree = (flat) => {
-    const map = {};
-    const roots = [];
-    flat.forEach((c) => (map[c.id] = { ...c, replies: [], depth: 0 }));
-    flat.forEach((c) => {
-      if (c.reply_to) {
-        const p = map[c.reply_to];
-        if (p) {
-          map[c.id].depth = p.depth + 1;
-          map[c.id].parent_user_id = p.user_id;
-          p.replies.push(map[c.id]);
-        } else {
-          roots.push(map[c.id]);
-        }
-      } else {
-        roots.push(map[c.id]);
+  // 삭제
+  const onDelete = useCallback(
+    async (commentId) => {
+      if (!commentId) return;
+      if (!confirm("정말 삭제하시겠습니까?")) return;
+      try {
+        await apiDeleteComment(commentId);
+        await load();
+      } catch (e) {
+        alert(e?.message || "삭제 중 오류가 발생했습니다.");
       }
-    });
-    const sortByDate = (a, b) => new Date(a.created_at) - new Date(b.created_at);
-    const dfsSort = (list) => {
-      list.sort(sortByDate);
-      list.forEach((x) => x.replies?.length && dfsSort(x.replies));
-    };
-    dfsSort(roots);
-    return roots;
-  };
+    },
+    [load]
+  );
 
-  const startReply = (commentId, nickname) => {
-    setReplyTargetId(commentId);
-    setReplyNickname(nickname);
-    setInputValue(`@${nickname} `);
-  };
-
-  const handleFinalSubmit = async ({
-    original,
-    polite,
-    logit_original,
-    logit_polite,
-    selected_version,
-    reply_to = null,
-    is_modified = false,
-  }) => {
-    try {
-      const s = Number(section);
-      const finalVersion = selected_version || selectedVersion || "original";
-
-      let payloadOriginal = original ?? "";
-      let payloadPolite = polite ?? "";
-      if (finalVersion === "polite") {
-        payloadPolite = inputValue;
-      } else {
-        payloadOriginal = inputValue;
-      }
-
-      await api.post("/comments/add", {
-        user_id: userId,
-        post_id: postId,
-        section: s,
-        original: payloadOriginal,
-        polite: payloadPolite,
-        logit_original,
-        logit_polite,
-        selected_version: finalVersion,
-        reply_to,
-        is_modified,
-      });
-
-      await fetchComments(s);
-      setInputValue("");
-      setReplyTargetId(null);
-      setReplyNickname("");
-      setSelectedVersion("original");
-    } catch (error) {
-      console.error("댓글 등록 실패:", error);
-      alert("댓글 등록 중 오류가 발생했습니다.");
-    }
-  };
+  // 등록 성공 후 콜백
+  const handleAfterSuccess = useCallback(async () => {
+    await load();
+    setReplyTarget(null);
+  }, [load]);
 
   return (
     <div
       className="comments-root"
       style={{
-        marginBottom: "2rem",
+        marginBottom: 24,
         display: "block",
         width: "100%",
         flex: "1 1 0%",
@@ -154,66 +95,139 @@ const Comments = ({ postId, section }) => {
         minWidth: 0,
       }}
     >
-      <h3 style={{ margin: "0 0 .5rem" }}>섹션 {section} 댓글</h3>
+      <h3 style={{ margin: "0 0 8px" }}>섹션 {section} 댓글</h3>
 
       <div
         className="comments-scroll"
         style={{
           width: "100%",
-          maxHeight: "480px",
+          maxHeight: 520,
           overflowY: "auto",
-          paddingRight: "10px",
-          border: "1px solid #444",
+          paddingRight: 10,
+          border: "1px solid #E5E7EB",
           backgroundColor: "#fff",
-          marginBottom: "1rem",
-          borderRadius: "6px",
+          marginBottom: 12,
+          borderRadius: 10,
           boxSizing: "border-box",
         }}
       >
-        {buildCommentTree(comments).map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            startReply={startReply}
-            depth={comment.depth > 0 ? 1 : 0}
-            currentUserId={userId}          
-            fetchComments={fetchComments}
-          />
-        ))}
+        {loading && (
+          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>불러오는 중…</div>
+        )}
+
+        {!loading && tree.length === 0 && (
+          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>첫 번째 댓글을 남겨보세요!</div>
+        )}
+
+        {!loading &&
+          tree.map((comment) => (
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              depth={comment.depth}
+              currentUserId={userId}
+              startReply={startReply}
+              onDelete={onDelete}
+              refresh={load}
+            />
+          ))}
       </div>
 
-      <CommentBox
-        userId={userId}
-        postId={postId}
-        inputValue={inputValue}
-        setInputValue={setInputValue}
-        onFinalSubmit={handleFinalSubmit}
-        setShowModal={setShowModal}
-        setModalData={setModalData}
-        replyTargetId={replyTargetId}
-        setReplyTargetId={setReplyTargetId}
-        replyNickname={replyNickname}
-      />
-
-      {showModal && (
-        <PopupModal
-          original={modalData.original}
-          suggested={modalData.polite}
-          onAccept={() => {
-            setSelectedVersion("polite");
-            setInputValue(modalData.polite || "");
-            setShowModal(false);
-          }}
-          onReject={() => {
-            setSelectedVersion("original");
-            setInputValue(modalData.original || "");
-            setShowModal(false);
-          }}
-          onClose={() => setShowModal(false)}
+      {/* 신규 댓글 입력 */}
+      <div style={{ marginBottom: 12 }}>
+        <CommentBox
+          userId={userId}
+          postId={postId}
+          section={section}
+          onAfterSuccess={handleAfterSuccess}
         />
+      </div>
+
+      {/* 대댓글 입력 */}
+      {replyTarget && (
+        <div
+          ref={replyInputRef}
+          style={{
+            border: "1px solid #E5E7EB",
+            borderRadius: 10,
+            padding: 12,
+            background: "#F9FAFB",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontWeight: 700 }}>대댓글 쓰기</span>
+            <span style={{ fontSize: 12, color: "#6B7280" }}>
+              대상: @{replyTarget.nickname} (ID: {replyTarget.id})
+            </span>
+            <button
+              onClick={cancelReply}
+              style={{
+                marginLeft: "auto",
+                background: "transparent",
+                border: "1px solid #D1D5DB",
+                borderRadius: 8,
+                padding: "6px 10px",
+                cursor: "pointer",
+              }}
+            >
+              취소
+            </button>
+          </div>
+
+          <CommentBox
+            userId={userId}
+            postId={postId}
+            section={section}
+            onAfterSuccess={handleAfterSuccess}
+            replyTo={replyTarget.id}
+            prefill={`@${replyTarget.nickname} `}
+          />
+        </div>
       )}
     </div>
   );
-};
+}
 
-export default Comments;
+// 트리 구조 변환
+function buildCommentTree(flat) {
+  if (!Array.isArray(flat)) return [];
+  const map = {};
+  const roots = [];
+
+  // 백엔드 필드명 -> 내부 표준화
+  flat.forEach((c) => {
+    const node = {
+      ...c,
+      reply_to: c.parent_comment_id ?? c.reply_to ?? null, 
+      created_at: c.created_at,
+      replies: [],
+      depth: 0,
+    };
+    map[c.id] = node;
+  });
+
+  flat.forEach((c) => {
+    const node = map[c.id];
+    const parentId = node.reply_to;
+    if (parentId) {
+      const parent = map[parentId];
+      if (parent) {
+        node.depth = (parent.depth || 0) + 1;
+        parent.replies.push(node);
+      } else {
+        roots.push(node);
+      }
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortByDate = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+  const sortDFS = (list) => {
+    list.sort(sortByDate);
+    list.forEach((x) => x.replies?.length && sortDFS(x.replies));
+  };
+  sortDFS(roots);
+
+  return roots;
+}

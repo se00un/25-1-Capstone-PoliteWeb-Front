@@ -1,7 +1,5 @@
-// Polite_Web-front/src/components/CommentItem.jsx
-import React from "react";
-import api from "../lib/api";
-import ReactionButtons from "./ReactionButtons";
+// src/components/CommentItem.jsx
+import React, { useMemo } from "react";
 
 const formattedDate = (timestamp) => {
   try {
@@ -22,120 +20,179 @@ const formattedDate = (timestamp) => {
 
 export default function CommentItem({
   comment,
-  currentUserId,   
-  startReply,
-  fetchComments,
   depth = 0,
+  currentUserId,
+  startReply,
+  onDelete,
+  refresh,
 }) {
-  const indentPx = depth > 0 ? 12 : 0;
-  const isTopLevel = depth === 0;
+  const {
+    id,
+    user_id,
+    text_final,
+    text_original,
+    text_generated_polite,
+    text_user_edit,
+    final_source,          
+    was_edited,          
+    created_at,
+    replies = [],
+  } = comment;
 
-  const nickname = String(comment.user_id ?? "").trim() || "익명";
-  const text =
-    (comment.selected_version === "polite" ? comment.polite : comment.original) ??
-    comment.content ??
-    "";
+  const author = useMemo(() => maskUser(user_id), [user_id]);
+  const canDelete = useMemo(() => String(currentUserId) === String(user_id), [currentUserId, user_id]);
 
-  const me = String(currentUserId ?? "").trim();
-  const own = typeof comment.owned_by_me === "boolean"
-    ? comment.owned_by_me
-    : (me && nickname && me === nickname);
+  // 표시용 본문: 최종 저장된 텍스트가 우선
+  const displayText = text_final ?? text_user_edit ?? text_generated_polite ?? text_original ?? "";
 
-  const handleDelete = async () => {
-    if (!confirm("댓글을 삭제할까요?")) return;
-    try {
-      await api.delete(`/comments/${comment.id}`, { data: { user_id: currentUserId } });
-      await fetchComments?.();
-    } catch (e) {
-      console.error(e);
-      alert("삭제 중 오류가 발생했습니다.");
+  // 메타 뱃지
+  const sourceBadge = useMemo(() => {
+    switch (final_source) {
+      case "original":
+        return { label: "원문", style: styles.badgeDark };
+      case "polite":
+        return { label: "순화", style: styles.badgeIndigo };
+      case "user_edit":
+        return { label: "수정", style: styles.badgeGreen };
+      case "blocked":
+        return { label: "차단", style: styles.badgeRed };
+      default:
+        return { label: "기타", style: styles.badgeGray };
     }
-  };
-
-  const containerStyle = {
-    marginLeft: `${indentPx}px`,
-    marginTop: depth > 0 ? "4px" : "3px",
-    backgroundColor: isTopLevel ? "#fff" : "#f5f5f5",
-    padding: "10px 12px",
-    borderRadius: "8px",
-    marginBottom: "6px",
-    lineHeight: "1.45",
-    fontSize: "15px",
-    boxShadow: isTopLevel ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-    border: depth > 0 ? "1px solid #eee" : "1px solid #e9e9e9",
-    width: "100%",
-    maxWidth: "100%",
-    boxSizing: "border-box",
-  };
+  }, [final_source]);
 
   return (
-    <>
-      <div style={containerStyle}>
-        {/* 상단 메타: 번호 · 작성시각 */}
-        <div style={{ fontSize: "12px", color: "#888", marginBottom: 4 }}>
-          #{comment.id} · {formattedDate(comment.created_at)}
+    <div style={{ ...styles.item, marginLeft: depth * 16 }}>
+      <div style={styles.header}>
+        <div style={styles.headerLeft}>
+          <span style={styles.author}>{author}</span>
+          <span style={styles.dot} />
+          <time style={styles.time} title={new Date(created_at).toISOString()}>
+            {formattedDate(created_at)}
+          </time>
+          <span style={styles.dot} />
+          <span style={{ ...styles.badge, ...sourceBadge.style }}>{sourceBadge.label}</span>
+          {Boolean(was_edited) && <span style={{ ...styles.badge, ...styles.badgeOutline }}>재작성</span>}
         </div>
 
-        {/* 본문 -: "닉네임: 댓글" */}
-        <div style={{ marginBottom: 8, color: "#222", whiteSpace: "pre-wrap" }}>
-          <strong style={{ color: "#333" }}>{nickname}:</strong>{" "}
-          <span>{text}</span>
-        </div>
-
-        {/* 액션 바: 좌측 반응 · 우측 답글/삭제 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ReactionButtons
-            commentId={comment.id}
-            userId={currentUserId}
-            initialLikeCount={comment.like_count ?? 0}
-            initialHateCount={comment.hate_count ?? 0}
-            initialLikedByMe={comment.liked_by_me ?? false}
-            initialHatedByMe={comment.hated_by_me ?? false}
-          />
-
-          <div style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: "12.5px" }}>
+        <div style={styles.headerRight}>
+          <button
+            onClick={() => startReply?.(id, author)}
+            style={{ ...styles.btn, ...styles.btnGhost }}
+            title="대댓글 달기"
+          >
+            답글
+          </button>
+          {canDelete && (
             <button
-              type="button"
-              onClick={() => startReply?.(comment.id, nickname)}
-              style={{ border: "none", background: "transparent", color: "#666", cursor: "pointer", padding: 0 }}
-              title="답글쓰기"
+              onClick={() => onDelete?.(id)}
+              style={{ ...styles.btn, ...styles.btnDanger }}
+              title="삭제"
             >
-              답글쓰기
+              삭제하기
             </button>
-
-            {own && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "#b33",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-                title="댓글 삭제"
-              >
-                삭제
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {/* 대댓글 재귀 */}
-      {comment.replies?.length > 0 &&
-        comment.replies.map((reply) => (
-          <CommentItem
-            key={reply.id}
-            comment={reply}
-            currentUserId={currentUserId}
-            startReply={startReply}
-            fetchComments={fetchComments}
-            depth={1}
-          />
-        ))}
-    </>
+      <div style={styles.body}>
+        <p style={styles.text}>{displayText}</p>
+      </div>
+
+      {replies?.length > 0 && (
+        <div style={styles.children}>
+          {replies.map((child) => (
+            <CommentItem
+              key={child.id}
+              comment={child}
+              depth={Math.min((child.depth ?? depth + 1), 6)}
+              currentUserId={currentUserId}
+              startReply={startReply}
+              onDelete={onDelete}
+              refresh={refresh}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
+
+// helper
+function maskUser(uid) {
+  if (!uid) return "익명";
+  const s = String(uid);
+  if (s.length <= 4) return `u_${s}`;
+  return `u_${s.slice(0, 2)}…${s.slice(-2)}`;
+}
+
+// style
+const styles = {
+  item: {
+    padding: "10px 12px",
+    borderBottom: "1px solid #F3F4F6",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  headerLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  headerRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: "auto",
+  },
+  author: { fontWeight: 700, color: "#111827" },
+  time: { color: "#6B7280", fontSize: 12 },
+  dot: { width: 4, height: 4, borderRadius: 8, background: "#D1D5DB" },
+  badge: {
+    fontSize: 11,
+    padding: "2px 6px",
+    borderRadius: 999,
+  },
+  badgeOutline: {
+    border: "1px solid #D1D5DB",
+    color: "#374151",
+    background: "white",
+    marginLeft: 4,
+  },
+  badgeDark: { background: "#111827", color: "white" },
+  badgeIndigo: { background: "#EEF2FF", color: "#3730A3" },
+  badgeGreen: { background: "#ECFDF5", color: "#065F46" },
+  badgeRed: { background: "#FEF2F2", color: "#991B1B" },
+  badgeGray: { background: "#F3F4F6", color: "#374151" },
+
+  btn: {
+    borderRadius: 8,
+    padding: "6px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    border: "1px solid transparent",
+  },
+  btnGhost: {
+    background: "white",
+    borderColor: "#E5E7EB",
+    color: "#111827",
+  },
+  btnDanger: {
+    background: "#DC2626",
+    color: "white",
+    borderColor: "#DC2626",
+  },
+
+  body: { paddingLeft: 2 },
+  text: { margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5, color: "#111827" },
+
+  children: { marginTop: 6 },
+  debug: { marginTop: 8, color: "#6B7280", fontSize: 12 },
+  debugRow: { marginTop: 4 },
+};
