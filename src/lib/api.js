@@ -103,7 +103,28 @@ export async function deleteComment(commentId) {
  */
 export async function logInterventionEvent(payload) {
   try {
-    const res = await api.post("/intervention-events", payload);
+    const safe = {
+      user_id: Number(payload.user_id),
+      post_id: Number(payload.post_id),
+      article_ord: Number(payload.article_ord ?? payload.section),
+      temp_uuid: payload.temp_uuid ?? null,
+      attempt_no: Number(payload.attempt_no ?? 1),
+
+      original_logit: payload.original_logit != null ? parseFloat(payload.original_logit) : null,
+      threshold_applied: payload.threshold_applied != null ? parseFloat(payload.threshold_applied) : null,
+      action_applied: payload.action_applied ?? "none",
+
+      generated_polite_text: payload.generated_polite_text ?? null,
+      user_edit_text: payload.user_edit_text ?? null,
+      edit_logit: payload.edit_logit != null ? parseFloat(payload.edit_logit) : null,
+
+      decision_rule_applied: payload.decision_rule_applied ?? "none",
+      final_choice_hint: payload.final_choice_hint ?? "unknown",
+
+      latency_ms: payload.latency_ms != null ? Number(payload.latency_ms) : null,
+    };
+
+    const res = await api.post("/intervention-events", safe);
     return res.data;
   } catch (e) {
     console.warn("[logInterventionEvent] failed:", e?.message || e);
