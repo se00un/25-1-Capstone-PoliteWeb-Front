@@ -14,10 +14,11 @@ const origin =
 if (!envBase && !origin) {
   console.warn("[api] VITE_API_BASE_URL 비어있고 window.origin도 없음(SSR/빌드 단계일 수 있음)");
 }
+console.log("[api] baseURL =", envBase || origin || "(empty)");
 
 const api = axios.create({
   baseURL: envBase || origin || "",
-  timeout: 15000,
+  timeout: 60000,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
@@ -110,10 +111,9 @@ export async function logInterventionEvent(payload) {
   }
 }
 
-
 export async function getExperimentMeta({ postId, section }) {
   try {
-    const res = await api.get("/intervention/meta", {
+    const res = await api.get("/intervention-events/meta", {
       params: { post_id: postId, section },
     });
     return res.data;
