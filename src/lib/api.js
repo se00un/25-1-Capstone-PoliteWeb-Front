@@ -1,13 +1,22 @@
 // src/lib/api.js
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
-if (!baseURL) {
-  console.warn("[api] VITE_API_BASE_URL 비어있음 → window.origin 사용");
+function trimSlash(s) {
+  return typeof s === "string" ? s.replace(/\/+$/g, "") : s;
+}
+
+const envBase = trimSlash(import.meta.env.VITE_API_BASE_URL?.trim());
+const origin =
+  typeof window !== "undefined" && window?.location?.origin
+    ? trimSlash(window.location.origin)
+    : undefined;
+
+if (!envBase && !origin) {
+  console.warn("[api] VITE_API_BASE_URL 비어있고 window.origin도 없음(SSR/빌드 단계일 수 있음)");
 }
 
 const api = axios.create({
-  baseURL: baseURL || window.location.origin,
+  baseURL: envBase || origin || "",
   timeout: 15000,
   headers: {
     Accept: "application/json",
@@ -16,8 +25,12 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const userId = localStorage.getItem("userId");
-  if (userId) config.headers["X-User-Id"] = userId;
+  try {
+    const userId =
+      typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+    if (userId) config.headers["X-User-Id"] = userId;
+  } catch {
+  }
   return config;
 });
 
@@ -33,7 +46,17 @@ api.interceptors.response.use(
   }
 );
 
-// Comments API
+/* =====================
+ * Session API
+ * ===================== */
+api.getSession = async function getSession() {
+  const res = await api.get("/session");
+  return res.data; // { user, post, section } 형태 기대
+};
+
+/* =====================
+ * Comments API
+ * ===================== */
 export async function suggestComment({ postId, section, text }) {
   const res = await api.post("/comments/suggest", {
     post_id: postId,
@@ -48,8 +71,16 @@ export async function saveComment(payload) {
   return res.data;
 }
 
-export async function fetchComments({ postId, section, sort = "new", page = 1, limit = 200 }) {
-  const res = await api.get("/comments", { params: { post_id: postId, section } });
+export async function fetchComments({
+  postId,
+  section,
+  sort = "new",
+  page = 1,
+  limit = 200,
+}) {
+  const res = await api.get("/comments", {
+    params: { post_id: postId, section, sort, page, limit },
+  });
   return res.data;
 }
 
@@ -58,25 +89,24 @@ export async function deleteComment(commentId) {
   return res.data;
 }
 
-// Intervention Events API
+/* =====================
+ * Intervention Events API
+ * ===================== */
 /**
- * 로그 기록
  * POST /intervention-events
- * payload 예시:
- * {
- *   user_id, post_id, article_ord, temp_uuid, attempt_no,
+ * payload:
+ * { user_id, post_id, article_ord, temp_uuid, attempt_no,
  *   original_logit, threshold_applied, action_applied,
  *   generated_polite_text, user_edit_text, edit_logit,
- *   decision_rule_applied, final_choice_hint, latency_ms
- * }
+ *   decision_rule_applied, final_choice_hint, latency_ms }
  */
 export async function logInterventionEvent(payload) {
   try {
     const res = await api.post("/intervention-events", payload);
-    return res.data; 
+    return res.data;
   } catch (e) {
     console.warn("[logInterventionEvent] failed:", e?.message || e);
-    return null; 
+    return null;
   }
 }
 
