@@ -110,4 +110,15 @@ export async function logInterventionEvent(payload) {
   }
 }
 
+
+export async function getExperimentMeta({ postId, section }) {
+  try {
+    const res = await api.get("/intervention/meta", {
+      params: { post_id: postId, section },
+    });
+    return res.data;
+  } catch (e) {
+    return null;
+  }
+}
 export default api;
