@@ -58,6 +58,17 @@ api.getSession = async function getSession() {
 /* =====================
  * Comments API
  * ===================== */
+
+export async function predictBert({ postId, text, threshold }) {
+  const res = await api.post("/bert/predict", {
+    post_id: Number(postId),
+    text: String(text),
+    threshold: threshold != null ? Number(threshold) : undefined,
+  });
+  // res.data: { text, post_id, policy_mode, threshold_applied, predicted_class, probability, over_threshold }
+  return res.data;
+}
+
 export async function suggestComment({ postId, section, text }) {
   const res = await api.post("/comments/suggest", {
     post_id: postId,
