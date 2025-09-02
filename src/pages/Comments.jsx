@@ -1,4 +1,5 @@
 // src/pages/Comments.jsx
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CommentItem from "../components/CommentItem";
 import CommentBox from "../components/CommentBox";
@@ -6,6 +7,7 @@ import {
   fetchComments as apiFetchComments,
   deleteComment as apiDeleteComment,
 } from "../lib/api";
+import { fetchReactionsBatch } from "../lib/api";
 
 export default function Comments({ postId, section }) {
   const [userId, setUserId] = useState("");
@@ -15,7 +17,6 @@ export default function Comments({ postId, section }) {
   const replyInputRef = useRef(null);
   const [replyTarget, setReplyTarget] = useState(null);
 
-  // 운영/디버그 모드에서만 실험 메타(배지/재작성) 노출
   const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "")
     .toLowerCase() === "true";
 
@@ -29,7 +30,7 @@ export default function Comments({ postId, section }) {
     setUserId(stored);
   }, []);
 
-  /** 댓글 목록 불러오기 */
+  /** 댓글 목록 불러오기 (+ 리액션 배치 병합) */
   const load = useCallback(async () => {
     if (!postId || section == null) return;
     try {
@@ -41,14 +42,47 @@ export default function Comments({ postId, section }) {
         page: 1,
         limit: 200,
       });
-      setComments(Array.isArray(data) ? data : []);
+
+      const base = (Array.isArray(data) ? data : []).map((c) => ({
+        ...c,
+        like_count: c.like_count ?? 0,
+        hate_count: c.hate_count ?? 0,
+        liked_by_me: c.liked_by_me ?? false,
+        hated_by_me: c.hated_by_me ?? false,
+      }));
+      setComments(base);
+
+      // 로그인(또는 userId 존재) 시 배치 상태 병합
+      if (userId) {
+        const ids = base.map((c) => c.id).filter(Boolean);
+        if (ids.length > 0) {
+          const batch = await fetchReactionsBatch(ids);
+          if (Array.isArray(batch) && batch.length > 0) {
+            const byId = new Map(batch.map((r) => [r.comment_id, r]));
+            setComments((prev) =>
+              prev.map((c) => {
+                const r = byId.get(c.id);
+                return r
+                  ? {
+                      ...c,
+                      like_count: r.like_count,
+                      hate_count: r.hate_count,
+                      liked_by_me: r.liked_by_me,
+                      hated_by_me: r.hated_by_me,
+                    }
+                  : c;
+              })
+            );
+          }
+        }
+      }
     } catch (e) {
       console.warn("[Comments] fetch error:", e?.message || e);
       setComments([]);
     } finally {
       setLoading(false);
     }
-  }, [postId, section]);
+  }, [postId, section, userId]);
 
   useEffect(() => {
     load();
@@ -89,6 +123,11 @@ export default function Comments({ postId, section }) {
     },
     [load]
   );
+
+  /** 자식에서 낙관적 업데이트 적용용 패처 */
+  const patchCommentById = useCallback((id, patch) => {
+    setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }, []);
 
   return (
     <div className="comments-root" style={{ marginBottom: 24 }}>
@@ -148,7 +187,8 @@ export default function Comments({ postId, section }) {
               startReply={startReply}
               onDelete={onDelete}
               refresh={load}
-              showExperimentMeta={SHOW_META}  
+              showExperimentMeta={SHOW_META}
+              onLocalUpdate={patchCommentById} 
             />
           ))}
       </div>
@@ -178,10 +218,10 @@ function buildCommentTree(flat) {
         node.depth = (parent.depth || 0) + 1;
         parent.replies.push(node);
       } else {
-        roots.push(node); // 고아 노드
+        roots.push(node); 
       }
     } else {
-      roots.push(node); // 루트
+      roots.push(node); 
     }
   });
 

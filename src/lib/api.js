@@ -137,6 +137,33 @@ export async function logInterventionEvent(payload) {
   }
 }
 
+// reaction API
+export async function toggleLike(commentId) {
+  const user_id = localStorage.getItem("userId");
+  if (!user_id) throw new Error("로그인이 필요합니다");
+  const res = await api.post(`/comments/${commentId}/like`, { user_id });
+  return res.data;
+}
+
+export async function toggleHate(commentId) {
+  const user_id = localStorage.getItem("userId");
+  if (!user_id) throw new Error("로그인이 필요합니다");
+  const res = await api.post(`/comments/${commentId}/hate`, { user_id });
+  return res.data;
+}
+
+export async function fetchReactionsBatch(commentIds = []) {
+  const user_id = localStorage.getItem("userId");
+  if (!user_id || !Array.isArray(commentIds) || commentIds.length === 0) return [];
+  const res = await api.post(`/comments/reactions/batch`, {
+    user_id,
+    comment_ids: commentIds,
+  });
+  return res.data || [];
+}
+
+
+// Experiment Meta API
 export async function getExperimentMeta({ postId, section }) {
   try {
     const res = await api.get("/intervention-events/meta", {
@@ -147,4 +174,5 @@ export async function getExperimentMeta({ postId, section }) {
     return null;
   }
 }
+
 export default api;

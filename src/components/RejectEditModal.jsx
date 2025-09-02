@@ -29,16 +29,15 @@ export default function RejectEditModal({
     <PopupModal
       open={open}
       onClose={onClose}
-      title="수정본이 여전히 기준을 초과했어요"
+      title="수정본이 여전히 정책 기준을 초과했어요"
       actions={[
-        { label: "✏️ 다시 수정하기", onClick: onEditAgain, variant: "outline" },
-        { label: "✅ 순화문으로 등록", onClick: onConfirm, variant: "primary" },
+        { label: "닫기", onClick: onConfirm, variant: "primary" },
       ]}
       width={720}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <p style={{ margin: 0, color: "#6B7280" }}>
-          방금 수정하신 문장이 정책 임계값{threshold != null ? `(θ=${Number(threshold).toFixed(2)})` : ""}을
+          방금 수정한 문장이 정책 임계값{threshold != null ? `(θ=${Number(threshold).toFixed(2)})` : ""}을
           여전히 초과했어요{typeof editLogit === "number" ? ` (추정=${editLogit.toFixed(3)})` : ""}.
           그래서 <b>순화문으로 댓글을 자동</b>등록합니다.
         </p>

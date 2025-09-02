@@ -1,5 +1,7 @@
 // src/components/CommentItem.jsx
-import React, { useMemo } from "react";
+
+import React, { useMemo, useState } from "react";
+import { toggleLike, toggleHate } from "../lib/api";
 
 const formattedDate = (timestamp) => {
   try {
@@ -26,6 +28,7 @@ export default function CommentItem({
   onDelete,
   refresh,
   showExperimentMeta = false,
+  onLocalUpdate, // reactions 낙관적 업데이트용 (선택)
 }) {
   const {
     id,
@@ -38,7 +41,16 @@ export default function CommentItem({
     was_edited,
     created_at,
     replies = [],
+
+    // reactions (배치 병합 또는 기본값)
+    like_count = 0,
+    hate_count = 0,
+    liked_by_me = false,
+    hated_by_me = false,
   } = comment;
+
+  const [inFlight, setInFlight] = useState(false);
+  const isAuthed = !!currentUserId;
 
   const author = useMemo(() => maskUser(user_id), [user_id]);
   const canDelete = useMemo(
@@ -64,6 +76,62 @@ export default function CommentItem({
         return { label: "기타", style: styles.badgeGray };
     }
   }, [final_source, showExperimentMeta]);
+
+  const handleLike = async () => {
+    if (!isAuthed || inFlight) return;
+    setInFlight(true);
+
+    const prev = { like_count, hate_count, liked_by_me, hated_by_me };
+    const nextLiked = !liked_by_me;
+
+    onLocalUpdate?.(id, {
+      liked_by_me: nextLiked,
+      like_count: like_count + (nextLiked ? 1 : -1),
+    });
+
+    try {
+      const res = await toggleLike(id);
+      onLocalUpdate?.(id, {
+        like_count: res.like_count,
+        hate_count: res.hate_count,
+        liked_by_me: res.liked_by_me,
+        hated_by_me: res.hated_by_me,
+      });
+    } catch (e) {
+      onLocalUpdate?.(id, prev);
+      alert(`좋아요 처리 실패: ${e.message}`);
+    } finally {
+      setInFlight(false);
+    }
+  };
+
+  const handleHate = async () => {
+    if (!isAuthed || inFlight) return;
+    setInFlight(true);
+
+    const prev = { like_count, hate_count, liked_by_me, hated_by_me };
+    const nextHated = !hated_by_me;
+
+    onLocalUpdate?.(id, {
+      hated_by_me: nextHated,
+      hate_count: hate_count + (nextHated ? 1 : -1),
+    });
+
+    try {
+      const res = await toggleHate(id);
+      onLocalUpdate?.(id, {
+        like_count: res.like_count,
+        hate_count: res.hate_count,
+        liked_by_me: res.liked_by_me,
+        hated_by_me: res.hated_by_me,
+      });
+    } catch (e) {
+      onLocalUpdate?.(id, prev);
+      alert(`싫어요 처리 실패: ${e.message}`);
+    } finally {
+      setInFlight(false);
+    }
+  };
 
   return (
     <div style={{ ...styles.item, marginLeft: depth * 16 }}>
@@ -91,6 +159,34 @@ export default function CommentItem({
         </div>
 
         <div style={styles.headerRight}>
+          {/* 좋아요 */}
+          <button
+            onClick={handleLike}
+            disabled={!isAuthed || inFlight}
+            title={isAuthed ? "좋아요" : "로그인이 필요합니다"}
+            style={{
+              ...styles.btn,
+              ...(liked_by_me ? styles.btnLikeActive : styles.btnLike),
+              ...(isAuthed && !inFlight ? null : styles.btnDisabled),
+            }}
+          >
+            👍 좋아요 {like_count}
+          </button>
+
+          {/* 싫어요 */}
+          <button
+            onClick={handleHate}
+            disabled={!isAuthed || inFlight}
+            title={isAuthed ? "싫어요" : "로그인이 필요합니다"}
+            style={{
+              ...styles.btn,
+              ...(hated_by_me ? styles.btnHateActive : styles.btnHate),
+              ...(isAuthed && !inFlight ? null : styles.btnDisabled),
+            }}
+          >
+            👎 싫어요 {hate_count}
+          </button>
+
           <button
             onClick={() => startReply?.(id, author)}
             style={{ ...styles.btn, ...styles.btnGhost }}
@@ -126,6 +222,7 @@ export default function CommentItem({
               onDelete={onDelete}
               refresh={refresh}
               showExperimentMeta={showExperimentMeta}
+              onLocalUpdate={onLocalUpdate}
             />
           ))}
         </div>
@@ -195,6 +292,7 @@ const styles = {
     fontSize: 12,
     fontWeight: 700,
     border: "1px solid transparent",
+    transition: "opacity .12s ease",
   },
   btnGhost: {
     background: "white",
@@ -205,6 +303,32 @@ const styles = {
     background: "#DC2626",
     color: "white",
     borderColor: "#DC2626",
+  },
+  btnDisabled: {
+    cursor: "not-allowed",
+    opacity: 0.7,
+  },
+
+  // reactions styles
+  btnLike: {
+    background: "#F3F4F6",
+    borderColor: "#D1D5DB",
+    color: "#111827",
+  },
+  btnLikeActive: {
+    background: "#2563EB",
+    borderColor: "#2563EB",
+    color: "white",
+  },
+  btnHate: {
+    background: "#F3F4F6",
+    borderColor: "#D1D5DB",
+    color: "#111827",
+  },
+  btnHateActive: {
+    background: "#DC2626",
+    borderColor: "#DC2626",
+    color: "white",
   },
 
   body: { paddingLeft: 2 },
