@@ -49,7 +49,7 @@ function PostListPage() {
       </h1>
 
       {posts.length === 0 ? (
-        <p style={{ color: "#777" }}>게시글이 없습니다.</p>
+        <p style={{ color: "#171616ff" }}>게시글이 없습니다.</p>
       ) : (
         <div
           style={{
@@ -87,7 +87,7 @@ function PostListPage() {
                 <h2 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.5rem" }}>
                   {post.title}
                 </h2>
-                <p style={{ fontSize: "0.95rem", color: "#555", lineHeight: 1.5 }}>
+                <p style={{ fontSize: "0.95rem", color: "var(--fg)", lineHeight: 1.5 }}>
                   {previewText || "(미리보기 없음)"}
                 </p>
               </div>

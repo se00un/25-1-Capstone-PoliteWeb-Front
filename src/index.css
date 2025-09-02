@@ -129,6 +129,11 @@ html, body, #root {
   margin-right: 6px;
 }
 
+.replies-stack {
+  margin-left: -16px;
+  padding-left: 16px;
+}
+
 
 /* Scroll area */
 .comments-list {

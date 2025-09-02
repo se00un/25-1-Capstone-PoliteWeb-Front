@@ -3,16 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CommentItem from "../components/CommentItem";
 import CommentBox from "../components/CommentBox";
-import {
-  fetchComments as apiFetchComments,
-  deleteComment as apiDeleteComment,
-} from "../lib/api";
-import { fetchReactionsBatch } from "../lib/api";
-import useReward from "../hooks/useReward";
-import RewardProgress from "../components/RewardProgress";
-import RewardModal from "../components/RewardModal";
+import { fetchComments as apiFetchComments, deleteComment as apiDeleteComment, fetchReactionsBatch } from "../lib/api";
 
-export default function Comments({ postId, section }) {
+export default function Comments({ postId, section, onAfterChange }) {
   const [userId, setUserId] = useState("");
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,9 +13,9 @@ export default function Comments({ postId, section }) {
   const replyInputRef = useRef(null);
   const [replyTarget, setReplyTarget] = useState(null);
 
-  const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "")
-    .toLowerCase() === "true";
+  const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "").toLowerCase() === "true";
 
+  // user ID
   useEffect(() => {
     let stored = localStorage.getItem("userId");
     if (!stored) {
@@ -32,21 +25,12 @@ export default function Comments({ postId, section }) {
     setUserId(stored);
   }, []);
 
-  const reward = useReward(postId);
-  const [rewardModalOpen, setRewardModalOpen] = useState(false);
-
+  // load comments
   const load = useCallback(async () => {
     if (!postId || section == null) return;
     try {
       setLoading(true);
-      const data = await apiFetchComments({
-        postId,
-        section,
-        sort: "new",
-        page: 1,
-        limit: 200,
-      });
-
+      const data = await apiFetchComments({ postId, section, sort: "new", page: 1, limit: 200 });
       const base = (Array.isArray(data) ? data : []).map((c) => ({
         ...c,
         like_count: c.like_count ?? 0,
@@ -87,29 +71,19 @@ export default function Comments({ postId, section }) {
     }
   }, [postId, section, userId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
+  // window focus → refresh
   useEffect(() => {
-    const onFocus = () => {
-      load();
-      reward.loadStatus();
-    };
+    const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [load]);
 
-  useEffect(() => {
-    if (postId && section != null) reward.loadStatus();
-  }, [postId, section]);
-
-  useEffect(() => {
-    if (reward.openOnceIfEligible()) setRewardModalOpen(true);
-  }, [reward.stage, reward.filled]);
-
+  // 트리
   const tree = useMemo(() => buildCommentTree(comments), [comments]);
 
+  // reply
   const startReply = useCallback((commentId, nickname) => {
     setReplyTarget({ id: commentId, nickname: nickname || "" });
     setTimeout(() => {
@@ -118,6 +92,7 @@ export default function Comments({ postId, section }) {
   }, []);
   const cancelReply = useCallback(() => setReplyTarget(null), []);
 
+  // delete
   const onDelete = useCallback(
     async (commentId) => {
       if (!commentId) return;
@@ -125,12 +100,12 @@ export default function Comments({ postId, section }) {
       try {
         await apiDeleteComment(commentId);
         await load();
-        await reward.loadStatus();
+        onAfterChange?.(); 
       } catch (e) {
         alert(e?.message || "삭제 중 오류가 발생했습니다.");
       }
     },
-    [load]
+    [load, onAfterChange]
   );
 
   const patchCommentById = useCallback((id, patch) => {
@@ -139,21 +114,6 @@ export default function Comments({ postId, section }) {
 
   return (
     <div className="comments-root">
-      {/* 1) 보상 섹션: 최상단 */}
-      <section className="reward-header">
-        <RewardProgress
-          counts={reward.counts}
-          capBySection={reward.capBySection}
-          overflowBySection={reward.overflowBySection}
-          required={reward.required}
-          stage={reward.stage}
-          progress={reward.progress}
-          filled={reward.filled}
-          onOpenModal={() => setRewardModalOpen(true)}
-        />
-      </section>
-
-      {/* 2) 댓글 영역(리스트는 스크롤) + 3) 작성창 하단 고정 */}
       <section className="comments-shell">
         <div className="comments-header">섹션 {section} 댓글</div>
 
@@ -183,7 +143,7 @@ export default function Comments({ postId, section }) {
           {replyTarget && <div ref={replyInputRef} />}
         </div>
 
-        {/* 작성창: 항상 하단 고정 */}
+        {/* 작성창: 하단 고정 */}
         <div className="composer-sticky">
           <CommentBox
             userId={userId}
@@ -191,8 +151,7 @@ export default function Comments({ postId, section }) {
             section={section}
             onAfterSuccess={async () => {
               await load();
-              await reward.loadStatus();
-              if (reward.openOnceIfEligible()) setRewardModalOpen(true);
+              onAfterChange?.(); // ← 부모(페이지)에게 알림
             }}
             replyTo={replyTarget?.id || null}
             prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
@@ -206,25 +165,11 @@ export default function Comments({ postId, section }) {
           )}
         </div>
       </section>
-
-      {/* 보상 팝업 */}
-      <RewardModal
-        open={rewardModalOpen}
-        onClose={() => setRewardModalOpen(false)}
-        stage={reward.stage}
-        counts={reward.counts}
-        required={reward.required}
-        claiming={reward.claiming}
-        onClaim={async () => {
-          await reward.claim();
-        }}
-        openchatUrl={reward.openchatUrl}
-        openchatPw={reward.openchatPw}
-      />
     </div>
   );
 }
 
+// helpers
 function maskUser(uid) {
   if (!uid) return "익명";
   const s = String(uid);
@@ -236,13 +181,9 @@ function buildCommentTree(flat) {
   if (!Array.isArray(flat)) return [];
   const map = {};
   const roots = [];
+
   flat.forEach((c) => {
-    map[c.id] = {
-      ...c,
-      replies: [],
-      depth: 0,          
-      reply_to_name: null 
-    };
+    map[c.id] = { ...c, replies: [], depth: 0, reply_to_name: null };
   });
 
   flat.forEach((c) => {
@@ -254,8 +195,7 @@ function buildCommentTree(flat) {
       const parent = map[pid];
       if (parent) {
         node.depth = 1; 
-        node.reply_to_name =
-          parent.nickname || parent.user_nickname || maskUser(parent.user_id);
+        node.reply_to_name = parent.nickname || parent.user_nickname || maskUser(parent.user_id);
         parent.replies.push(node);
       } else {
         roots.push(node);

@@ -56,7 +56,7 @@ export default function CommentItem({
     text_final ?? text_user_edit ?? text_generated_polite ?? text_original ?? "";
 
   const isReply = depth > 0;
-  const indentPx = isReply ? 16 : 0; 
+  const indentPx = 0; 
 
   const sourceBadge = useMemo(() => {
     if (!showExperimentMeta) return null;
@@ -103,8 +103,8 @@ export default function CommentItem({
     <div
       style={{
         ...styles.item,
-        marginLeft: indentPx,
-        background: isReply ? "var(--surface)" : "transparent", 
+        marginLeft: 0,
+        background: isReply ? "var(--surface)" : "transparent",
         borderRadius: isReply ? 12 : 0,
         padding: "10px 12px",
       }}
