@@ -225,31 +225,43 @@ export default function Comments({ postId, section }) {
   );
 }
 
+function maskUser(uid) {
+  if (!uid) return "익명";
+  const s = String(uid);
+  if (s.length <= 4) return `u_${s}`;
+  return `u_${s.slice(0, 2)}…${s.slice(-2)}`;
+}
+
 function buildCommentTree(flat) {
   if (!Array.isArray(flat)) return [];
   const map = {};
   const roots = [];
-
-  // id → node
   flat.forEach((c) => {
-    map[c.id] = { ...c, replies: [], depth: 0, reply_to_name: null };
+    map[c.id] = {
+      ...c,
+      replies: [],
+      depth: 0,          
+      reply_to_name: null 
+    };
   });
 
   flat.forEach((c) => {
     const node = map[c.id];
     if (!node) return;
 
-    if (c.parent_comment_id) {
-      const parent = map[c.parent_comment_id];
+    const pid = c.parent_comment_id;
+    if (pid) {
+      const parent = map[pid];
       if (parent) {
-        node.depth = (parent.depth || 0) + 1;
-        node.reply_to_name = parent.nickname || parent.user_nickname || parent.user_id || "익명";
+        node.depth = 1; 
+        node.reply_to_name =
+          parent.nickname || parent.user_nickname || maskUser(parent.user_id);
         parent.replies.push(node);
       } else {
         roots.push(node);
       }
     } else {
-      roots.push(node);
+      roots.push(node); 
     }
   });
 
