@@ -8,6 +8,9 @@ import {
   deleteComment as apiDeleteComment,
 } from "../lib/api";
 import { fetchReactionsBatch } from "../lib/api";
+import useReward from "../hooks/useReward";
+import RewardProgress from "../components/RewardProgress";
+import RewardModal from "../components/RewardModal";
 
 export default function Comments({ postId, section }) {
   const [userId, setUserId] = useState("");
@@ -20,7 +23,7 @@ export default function Comments({ postId, section }) {
   const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "")
     .toLowerCase() === "true";
 
-  /** userId 초기화 */
+  // user ID 초기화
   useEffect(() => {
     let stored = localStorage.getItem("userId");
     if (!stored) {
@@ -30,7 +33,7 @@ export default function Comments({ postId, section }) {
     setUserId(stored);
   }, []);
 
-  /** 댓글 목록 불러오기 (+ 리액션 배치 병합) */
+  // 댓글 목록 불러오기
   const load = useCallback(async () => {
     if (!postId || section == null) return;
     try {
@@ -52,7 +55,6 @@ export default function Comments({ postId, section }) {
       }));
       setComments(base);
 
-      // 로그인(또는 userId 존재) 시 배치 상태 병합
       if (userId) {
         const ids = base.map((c) => c.id).filter(Boolean);
         if (ids.length > 0) {
@@ -88,28 +90,29 @@ export default function Comments({ postId, section }) {
     load();
   }, [load]);
 
-  /** 창 focus 시 새로고침 */
+  // 새로고침
   useEffect(() => {
-    const onFocus = () => load();
+    const onFocus = () => {
+      load();
+      reward.loadStatus(); // 보상 상태 갱신
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [load]);
+  }, [load]); 
 
-  /** 평면 → 트리 변환 */
+  // 댓글 트리 구조 변환
   const tree = useMemo(() => buildCommentTree(comments), [comments]);
 
-  /** 대댓글 시작 */
+  // 대댓글 시작 및 취소
   const startReply = useCallback((commentId, nickname) => {
     setReplyTarget({ id: commentId, nickname: nickname || "" });
     setTimeout(() => {
       replyInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 0);
   }, []);
-
-  /** 대댓글 취소 */
   const cancelReply = useCallback(() => setReplyTarget(null), []);
 
-  /** 삭제 */
+  // 댓글 삭제
   const onDelete = useCallback(
     async (commentId) => {
       if (!commentId) return;
@@ -117,28 +120,60 @@ export default function Comments({ postId, section }) {
       try {
         await apiDeleteComment(commentId);
         await load();
+        await reward.loadStatus(); 
       } catch (e) {
         alert(e?.message || "삭제 중 오류가 발생했습니다.");
       }
     },
-    [load]
+    [load] 
   );
 
-  /** 자식에서 낙관적 업데이트 적용용 패처 */
   const patchCommentById = useCallback((id, patch) => {
     setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }, []);
 
+
+  // 보상 팝업 연결
+  const reward = useReward(postId);
+  const [rewardModalOpen, setRewardModalOpen] = useState(false);
+
+  // 페이지 진입/섹션 변경 시 보상 상태 조회
+  useEffect(() => {
+    if (postId && section != null) reward.loadStatus();
+  }, [postId, section]);
+
+  // 조건 달성 & 미수령 → 자동 팝업 1회
+  useEffect(() => {
+    if (reward.openOnceIfEligible()) setRewardModalOpen(true);
+  }, [reward.stage, reward.filled]); 
+
   return (
     <div className="comments-root" style={{ marginBottom: 24 }}>
       <h3 style={{ margin: "0 0 8px" }}>섹션 {section} 댓글</h3>
+
+      <div style={{ margin: "8px 0 12px" }}>
+        <RewardProgress
+          counts={reward.counts}
+          capBySection={reward.capBySection}
+          overflowBySection={reward.overflowBySection}
+          required={reward.required}
+          stage={reward.stage}
+          progress={reward.progress}
+          filled={reward.filled}
+          onOpenModal={() => setRewardModalOpen(true)}
+        />
+      </div>
 
       {/* 댓글 작성 */}
       <CommentBox
         userId={userId}
         postId={postId}
         section={section}
-        onAfterSuccess={load}
+        onAfterSuccess={async () => {
+          await load();
+          await reward.loadStatus(); 
+          if (reward.openOnceIfEligible()) setRewardModalOpen(true); 
+        }}
         replyTo={replyTarget?.id || null}
         prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
         placeholder={replyTarget ? "대댓글을 입력하세요…" : "댓글을 입력하세요…"}
@@ -188,13 +223,28 @@ export default function Comments({ postId, section }) {
               onDelete={onDelete}
               refresh={load}
               showExperimentMeta={SHOW_META}
-              onLocalUpdate={patchCommentById} 
+              onLocalUpdate={patchCommentById}
             />
           ))}
       </div>
 
       {/* 대댓글 입력 위치 앵커 */}
       {replyTarget && <div ref={replyInputRef} />}
+
+      {/* 보상 팝업 */}
+      <RewardModal
+        open={rewardModalOpen}
+        onClose={() => setRewardModalOpen(false)}
+        stage={reward.stage}
+        counts={reward.counts}
+        required={reward.required}
+        claiming={reward.claiming}
+        onClaim={async () => {
+          const r = await reward.claim();
+        }}
+        openchatUrl={reward.openchatUrl}
+        openchatPw={reward.openchatPw}
+      />
     </div>
   );
 }

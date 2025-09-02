@@ -175,4 +175,54 @@ export async function getExperimentMeta({ postId, section }) {
   }
 }
 
+// reward API (process)
+export async function fetchRewardEligibility(postId) {
+  const user_id = localStorage.getItem("userId");
+  if (!user_id) throw new Error("로그인이 필요합니다");
+
+  const res = await api.post("/rewards/eligibility", {
+    user_id: Number(user_id),
+    post_id: Number(postId),
+  });
+
+  const data = res.data || {};
+  const c = data.per_section_counts || {};
+
+  const per_section_counts = {
+    1: Number(c[1] ?? c["1"] ?? 0),
+    2: Number(c[2] ?? c["2"] ?? 0),
+    3: Number(c[3] ?? c["3"] ?? 0),
+  };
+
+  return {
+    eligible: !!data.eligible,
+    already_claimed: !!data.already_claimed,
+    per_section_counts,
+    total_count:
+      data.total_count != null
+        ? Number(data.total_count)
+        : per_section_counts[1] + per_section_counts[2] + per_section_counts[3],
+  };
+}
+
+// reward API (claim)
+export async function claimReward(postId) {
+  const user_id = localStorage.getItem("userId");
+  if (!user_id) throw new Error("로그인이 필요합니다");
+
+  const res = await api.post("/rewards/claim", {
+    user_id: Number(user_id),
+    post_id: Number(postId),
+  });
+
+  const data = res.data || {};
+  return {
+    ok: !!(data.granted || data.already_claimed),
+    granted: !!data.granted,
+    already_claimed: !!data.already_claimed,
+    openchat_url: data.openchat_url || null,
+    openchat_pw: data.openchat_pw || null,
+  };
+}
+
 export default api;
