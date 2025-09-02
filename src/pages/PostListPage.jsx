@@ -1,4 +1,5 @@
 // src/pages/PostListPage.jsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -33,7 +34,7 @@ function PostListPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#f5f5f5",
+        backgroundColor: "var(--bg)",  
         padding: "2rem",
       }}
     >
@@ -43,13 +44,14 @@ function PostListPage() {
           fontWeight: "bold",
           marginBottom: "2rem",
           textAlign: "center",
+          color: "var(--fg)",           
         }}
       >
         📚 게시글 목록
       </h1>
 
       {posts.length === 0 ? (
-        <p style={{ color: "#171616ff" }}>게시글이 없습니다.</p>
+        <p style={{ color: "var(--muted)" }}>게시글이 없습니다.</p>  
       ) : (
         <div
           style={{
@@ -64,33 +66,48 @@ function PostListPage() {
         >
           {posts.map((post) => {
             const preview = (post?.content ?? "").toString();
-            const previewText = preview.length > 60 ? preview.slice(0, 60) + "..." : preview;
+            const previewText =
+              preview.length > 60 ? preview.slice(0, 60) + "..." : preview;
             return (
-              <div
+              <article
                 key={post.id}
                 onClick={() => handleClick(post)}
                 style={{
-                  backgroundColor: "#fff",
+                  backgroundColor: "var(--card)",     
                   padding: "1.5rem",
-                  borderRadius: "8px",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border)",  
+                  boxShadow: "0 2px 6px var(--elev)", 
                   cursor: "pointer",
-                  transition: "box-shadow 0.2s ease",
+                  transition: "box-shadow .2s ease, transform .06s ease",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.05)")
-                }
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 4px 12px var(--elev)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "0 2px 6px var(--elev)";
+                }}
               >
-                <h2 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                <h2
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: 700,
+                    marginBottom: ".5rem",
+                    color: "var(--fg)",                
+                  }}
+                >
                   {post.title}
                 </h2>
-                <p style={{ fontSize: "0.95rem", color: "var(--fg)", lineHeight: 1.5 }}>
+                <p
+                  style={{
+                    fontSize: "0.95rem",
+                    color: "var(--fg)",               
+                    lineHeight: 1.5,
+                  }}
+                >
                   {previewText || "(미리보기 없음)"}
                 </p>
-              </div>
+              </article>
             );
           })}
         </div>
@@ -100,4 +117,3 @@ function PostListPage() {
 }
 
 export default PostListPage;
-
