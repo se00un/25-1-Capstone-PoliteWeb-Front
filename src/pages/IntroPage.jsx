@@ -1,5 +1,4 @@
 // polite-front/src/pages/IntroPage.jsx
-
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -21,7 +20,7 @@ const IntroPage = () => {
           border: "1px solid var(--border)",
           borderRadius: 12,
           boxShadow: "0 6px 18px var(--elev)",
-          padding: "24px",
+          padding: 24,
         }}
       >
         <h1
@@ -45,17 +44,16 @@ const IntroPage = () => {
           <li>
             <strong>공격적/모욕적 표현</strong>을 포함한 댓글 작성이 실험 목적으로 허용됩니다.
           </li>
+          <li>원문이 시스템 기준을 <strong>통과하면 그대로 등록</strong>됩니다.</li>
           <li>
-            원문이 시스템 기준을 <strong>통과하면 그대로 등록</strong>됩니다.
-          </li>
-          <li>
-            기준을 <strong>초과</strong>하면 <strong>댓글은 웹사이트 정책을</strong> 따르게 됩니다. 웹사이트 정책은:
+            기준을 <strong>초과</strong>하면 <strong>댓글은 웹사이트 정책</strong>을 따릅니다:
             <ul style={{ margin: "6px 0 0 1.1rem", color: "var(--muted)" }}>
               <li>① 순화문이 등록됨</li>
               <li>② 댓글이 차단됨</li>
             </ul>
+          </li>
           <li>
-            팝업 처리 중에는 <strong>페이지 이동/새로고침을 하지 말아주세요.</strong> (최대 1분이 소요될 수 있습니다)
+            처리 중에는 <strong>페이지 이동/새로고침을 하지 말아주세요.</strong> (최대 1분이 소요될 수 있습니다)
           </li>
           <li>
             댓글은 <strong>등록 후 수정 불가</strong>이며, 본인이 <strong>삭제</strong>할 수 있습니다.
@@ -79,8 +77,7 @@ const IntroPage = () => {
           <li>로그인 후 게시글을 선택합니다.</li>
           <li>비밀번호 입력 후 섹션을 이동하며 댓글을 작성합니다.</li>
           <li>
-            순화 제안이 나타나면 옵션 중 하나를 선택해 등록을 완료합니다
-            (필요 시 입력창에 불러와 수정 후 등록).
+            기준 초과 시 정책에 따라 순화문 등록 또는 차단이 이루어질 수 있습니다.
           </li>
         </ol>
 
