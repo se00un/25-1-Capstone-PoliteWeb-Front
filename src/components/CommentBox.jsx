@@ -46,7 +46,7 @@ export default function CommentBox({
   }, []);
 
   const afterSuccess = useCallback(
-    (res, msg = "등록되었습니다!") => {
+    async (res, msg = "등록되었습니다!") => {
       setText("");
       setSecondAttempt(false);
       setOriginalText("");
@@ -54,7 +54,9 @@ export default function CommentBox({
       setBanOpen(false);
       setPoliteOpen(false);
       showToast(msg, "success");
-      onAfterSuccess?.(res);
+  if (onAfterSuccess) {
+    await onAfterSuccess(res);       
+  }
       flowUuidRef.current = crypto?.randomUUID?.() || `tmp_${Math.random().toString(36).slice(2)}`;
     },
     [onAfterSuccess, showToast]
@@ -79,7 +81,11 @@ export default function CommentBox({
           text_user_edit: text,
           parent_comment_id: replyTo || undefined,
         });
-        await logInterventionEvent({
+        if (!res?.saved) {
+          showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
+          return;
+        }
+        logInterventionEvent({
           user_id: userId,
           post_id: postId,
           article_ord: section,
@@ -94,7 +100,7 @@ export default function CommentBox({
           final_choice_hint: predEdit.over_threshold ? "polite" : "user_edit",
           latency_ms: Math.round(performance.now() - t0Ref.current),
         });
-        return afterSuccess(res, predEdit.over_threshold ? "순화 fallback으로 등록되었습니다!" : "수정된 문장으로 등록되었습니다!");
+        return await afterSuccess(res, predEdit.over_threshold ? "순화 fallback으로 등록되었습니다!" : "수정된 문장으로 등록되었습니다!");
       } catch (e) {
         showToast(e.message || "등록 중 오류가 발생했습니다.", "error");
       } finally {
@@ -120,7 +126,7 @@ export default function CommentBox({
           text_original: text,
           parent_comment_id: replyTo || undefined,
         });
-        await logInterventionEvent({
+        logInterventionEvent({
           user_id: userId,
           post_id: postId,
           article_ord: section,
@@ -132,13 +138,13 @@ export default function CommentBox({
           final_choice_hint: "original",
           latency_ms: Math.round(performance.now() - t0Ref.current),
         });
-        return afterSuccess(res, "등록되었습니다!");
+        return await afterSuccess(res, "등록되었습니다!");
       }
 
       if (s.policy_mode === "block") {
         // 그룹 A 차단
         setBanOpen(true);
-        await logInterventionEvent({
+        logInterventionEvent({
           user_id: userId,
           post_id: postId,
           article_ord: section,
@@ -160,7 +166,7 @@ export default function CommentBox({
         setSuggestedText(s.polite_text);
         setSecondAttempt(false);
         setPoliteOpen(true);
-        await logInterventionEvent({
+        logInterventionEvent({
           user_id: userId,
           post_id: postId,
           article_ord: section,
@@ -196,7 +202,11 @@ export default function CommentBox({
         text_final: suggestedText,
         parent_comment_id: replyTo || undefined,
       });
-      await logInterventionEvent({
+      if (!res?.saved) {
+        showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
+        return;
+      }
+      logInterventionEvent({
         user_id: userId,
         post_id: postId,
         article_ord: section,
