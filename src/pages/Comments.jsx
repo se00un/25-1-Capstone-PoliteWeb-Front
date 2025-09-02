@@ -23,7 +23,6 @@ export default function Comments({ postId, section }) {
   const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "")
     .toLowerCase() === "true";
 
-  // user ID 초기화
   useEffect(() => {
     let stored = localStorage.getItem("userId");
     if (!stored) {
@@ -33,7 +32,9 @@ export default function Comments({ postId, section }) {
     setUserId(stored);
   }, []);
 
-  // 댓글 목록 불러오기
+  const reward = useReward(postId);
+  const [rewardModalOpen, setRewardModalOpen] = useState(false);
+
   const load = useCallback(async () => {
     if (!postId || section == null) return;
     try {
@@ -90,20 +91,25 @@ export default function Comments({ postId, section }) {
     load();
   }, [load]);
 
-  // 새로고침
   useEffect(() => {
     const onFocus = () => {
       load();
-      reward.loadStatus(); // 보상 상태 갱신
+      reward.loadStatus();
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [load]); 
+  }, [load]);
 
-  // 댓글 트리 구조 변환
+  useEffect(() => {
+    if (postId && section != null) reward.loadStatus();
+  }, [postId, section]);
+
+  useEffect(() => {
+    if (reward.openOnceIfEligible()) setRewardModalOpen(true);
+  }, [reward.stage, reward.filled]);
+
   const tree = useMemo(() => buildCommentTree(comments), [comments]);
 
-  // 대댓글 시작 및 취소
   const startReply = useCallback((commentId, nickname) => {
     setReplyTarget({ id: commentId, nickname: nickname || "" });
     setTimeout(() => {
@@ -112,7 +118,6 @@ export default function Comments({ postId, section }) {
   }, []);
   const cancelReply = useCallback(() => setReplyTarget(null), []);
 
-  // 댓글 삭제
   const onDelete = useCallback(
     async (commentId) => {
       if (!commentId) return;
@@ -120,38 +125,22 @@ export default function Comments({ postId, section }) {
       try {
         await apiDeleteComment(commentId);
         await load();
-        await reward.loadStatus(); 
+        await reward.loadStatus();
       } catch (e) {
         alert(e?.message || "삭제 중 오류가 발생했습니다.");
       }
     },
-    [load] 
+    [load]
   );
 
   const patchCommentById = useCallback((id, patch) => {
     setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }, []);
 
-
-  // 보상 팝업 연결
-  const reward = useReward(postId);
-  const [rewardModalOpen, setRewardModalOpen] = useState(false);
-
-  // 페이지 진입/섹션 변경 시 보상 상태 조회
-  useEffect(() => {
-    if (postId && section != null) reward.loadStatus();
-  }, [postId, section]);
-
-  // 조건 달성 & 미수령 → 자동 팝업 1회
-  useEffect(() => {
-    if (reward.openOnceIfEligible()) setRewardModalOpen(true);
-  }, [reward.stage, reward.filled]); 
-
   return (
-    <div className="comments-root" style={{ marginBottom: 24 }}>
-      <h3 style={{ margin: "0 0 8px" }}>섹션 {section} 댓글</h3>
-
-      <div style={{ margin: "8px 0 12px" }}>
+    <div className="comments-root">
+      {/* 1) 보상 섹션: 최상단 */}
+      <section className="reward-header">
         <RewardProgress
           counts={reward.counts}
           capBySection={reward.capBySection}
@@ -162,74 +151,61 @@ export default function Comments({ postId, section }) {
           filled={reward.filled}
           onOpenModal={() => setRewardModalOpen(true)}
         />
-      </div>
+      </section>
 
-      {/* 댓글 작성 */}
-      <CommentBox
-        userId={userId}
-        postId={postId}
-        section={section}
-        onAfterSuccess={async () => {
-          await load();
-          await reward.loadStatus(); 
-          if (reward.openOnceIfEligible()) setRewardModalOpen(true); 
-        }}
-        replyTo={replyTarget?.id || null}
-        prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
-        placeholder={replyTarget ? "대댓글을 입력하세요…" : "댓글을 입력하세요…"}
-      />
+      {/* 2) 댓글 영역(리스트는 스크롤) + 3) 작성창 하단 고정 */}
+      <section className="comments-shell">
+        <div className="comments-header">섹션 {section} 댓글</div>
 
-      {/* 대댓글 취소 버튼 */}
-      {replyTarget && (
-        <div style={{ margin: "6px 0" }}>
-          <button onClick={cancelReply} style={{ fontSize: 12, color: "#6B7280" }}>
-            대댓글 취소
-          </button>
+        <div className="comments-list">
+          {loading && <div className="comments-empty">불러오는 중…</div>}
+
+          {!loading && tree.length === 0 && (
+            <div className="comments-empty">첫 번째 댓글을 남겨보세요!</div>
+          )}
+
+          {!loading &&
+            tree.map((comment) => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                depth={comment.depth}
+                currentUserId={userId}
+                startReply={startReply}
+                onDelete={onDelete}
+                refresh={load}
+                showExperimentMeta={SHOW_META}
+                onLocalUpdate={patchCommentById}
+              />
+            ))}
+
+          {/* 대댓글 입력 위치 앵커 */}
+          {replyTarget && <div ref={replyInputRef} />}
         </div>
-      )}
 
-      {/* 댓글 목록 */}
-      <div
-        className="comments-scroll"
-        style={{
-          width: "100%",
-          maxHeight: 520,
-          overflowY: "auto",
-          paddingRight: 10,
-          border: "1px solid #E5E7EB",
-          backgroundColor: "#fff",
-          marginTop: 12,
-          borderRadius: 10,
-        }}
-      >
-        {loading && (
-          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>
-            불러오는 중…
-          </div>
-        )}
-        {!loading && tree.length === 0 && (
-          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>
-            첫 번째 댓글을 남겨보세요!
-          </div>
-        )}
-        {!loading &&
-          tree.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              depth={comment.depth}
-              currentUserId={userId}
-              startReply={startReply}
-              onDelete={onDelete}
-              refresh={load}
-              showExperimentMeta={SHOW_META}
-              onLocalUpdate={patchCommentById}
-            />
-          ))}
-      </div>
+        {/* 작성창: 항상 하단 고정 */}
+        <div className="composer-sticky">
+          <CommentBox
+            userId={userId}
+            postId={postId}
+            section={section}
+            onAfterSuccess={async () => {
+              await load();
+              await reward.loadStatus();
+              if (reward.openOnceIfEligible()) setRewardModalOpen(true);
+            }}
+            replyTo={replyTarget?.id || null}
+            prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
+            placeholder={replyTarget ? "대댓글을 입력하세요…" : "댓글을 입력하세요…"}
+          />
 
-      {/* 대댓글 입력 위치 앵커 */}
-      {replyTarget && <div ref={replyInputRef} />}
+          {replyTarget && (
+            <div className="reply-cancel">
+              <button onClick={cancelReply}>대댓글 취소</button>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* 보상 팝업 */}
       <RewardModal
@@ -240,7 +216,7 @@ export default function Comments({ postId, section }) {
         required={reward.required}
         claiming={reward.claiming}
         onClaim={async () => {
-          const r = await reward.claim();
+          await reward.claim();
         }}
         openchatUrl={reward.openchatUrl}
         openchatPw={reward.openchatPw}
@@ -249,29 +225,31 @@ export default function Comments({ postId, section }) {
   );
 }
 
-// 트리 변환 유틸
 function buildCommentTree(flat) {
   if (!Array.isArray(flat)) return [];
   const map = {};
   const roots = [];
 
+  // id → node
   flat.forEach((c) => {
-    map[c.id] = { ...c, replies: [], depth: 0 };
+    map[c.id] = { ...c, replies: [], depth: 0, reply_to_name: null };
   });
 
   flat.forEach((c) => {
     const node = map[c.id];
     if (!node) return;
+
     if (c.parent_comment_id) {
       const parent = map[c.parent_comment_id];
       if (parent) {
         node.depth = (parent.depth || 0) + 1;
+        node.reply_to_name = parent.nickname || parent.user_nickname || parent.user_id || "익명";
         parent.replies.push(node);
       } else {
-        roots.push(node); 
+        roots.push(node);
       }
     } else {
-      roots.push(node); 
+      roots.push(node);
     }
   });
 

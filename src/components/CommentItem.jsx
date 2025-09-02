@@ -1,5 +1,4 @@
 // src/components/CommentItem.jsx
-
 import React, { useMemo, useState } from "react";
 import { toggleLike, toggleHate } from "../lib/api";
 
@@ -22,17 +21,18 @@ const formattedDate = (timestamp) => {
 
 export default function CommentItem({
   comment,
-  depth = 0,
+  depth = 0,            
   currentUserId,
   startReply,
   onDelete,
   refresh,
   showExperimentMeta = false,
-  onLocalUpdate, // reactions 낙관적 업데이트용 (선택)
+  onLocalUpdate,        
 }) {
   const {
     id,
     user_id,
+    nickname,            
     text_final,
     text_original,
     text_generated_polite,
@@ -41,46 +41,47 @@ export default function CommentItem({
     was_edited,
     created_at,
     replies = [],
-
-    // reactions (배치 병합 또는 기본값)
+    reply_to_name,
     like_count = 0,
     hate_count = 0,
     liked_by_me = false,
     hated_by_me = false,
-  } = comment;
+  } = comment || {};
 
   const [inFlight, setInFlight] = useState(false);
   const isAuthed = !!currentUserId;
 
-  const author = useMemo(() => maskUser(user_id), [user_id]);
+  const authorLabel = useMemo(() => {
+    return nickname || maskUser(user_id);
+  }, [nickname, user_id]);
+
   const canDelete = useMemo(
     () => String(currentUserId) === String(user_id),
     [currentUserId, user_id]
   );
 
-  const displayText =
-    text_final ?? text_user_edit ?? text_generated_polite ?? text_original ?? "";
+  // 본문 표시용
+  const displayText = text_final ?? text_user_edit ?? text_generated_polite ?? text_original ?? "";
+
+  // 대댓글 여부 
+  const isReply = depth > 0;
+  const indentPx = isReply ? 16 : 0;
 
   const sourceBadge = useMemo(() => {
     if (!showExperimentMeta) return null;
     switch (final_source) {
-      case "original":
-        return { label: "원문", style: styles.badgeDark };
-      case "polite":
-        return { label: "순화", style: styles.badgeIndigo };
-      case "user_edit":
-        return { label: "수정", style: styles.badgeGreen };
-      case "blocked":
-        return { label: "차단", style: styles.badgeRed };
-      default:
-        return { label: "기타", style: styles.badgeGray };
+      case "original":   return { label: "원문",   style: styles.badgeDark };
+      case "polite":     return { label: "순화",   style: styles.badgeIndigo };
+      case "user_edit":  return { label: "수정",   style: styles.badgeGreen };
+      case "blocked":    return { label: "차단",   style: styles.badgeRed };
+      default:           return { label: "기타",   style: styles.badgeGray };
     }
   }, [final_source, showExperimentMeta]);
 
+  // 좋아요/싫어요
   const handleLike = async () => {
     if (!isAuthed || inFlight) return;
     setInFlight(true);
-
     const prev = { like_count, hate_count, liked_by_me, hated_by_me };
     const nextLiked = !liked_by_me;
 
@@ -108,7 +109,6 @@ export default function CommentItem({
   const handleHate = async () => {
     if (!isAuthed || inFlight) return;
     setInFlight(true);
-
     const prev = { like_count, hate_count, liked_by_me, hated_by_me };
     const nextHated = !hated_by_me;
 
@@ -134,32 +134,37 @@ export default function CommentItem({
   };
 
   return (
-    <div style={{ ...styles.item, marginLeft: depth * 16 }}>
+    <div
+      style={{
+        ...styles.item,
+        marginLeft: indentPx,
+        background: isReply ? "var(--surface)" : "transparent", 
+        borderRadius: isReply ? 12 : 0,
+        padding: isReply ? "10px 12px" : "10px 12px",
+      }}
+    >
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <span style={styles.author}>{author}</span>
+          <strong style={styles.author}>{authorLabel}</strong>
           <span style={styles.dot} />
           <time style={styles.time} title={new Date(created_at).toISOString()}>
             {formattedDate(created_at)}
           </time>
 
-          {showExperimentMeta && sourceBadge ? (
-            <>
-              <span style={styles.dot} />
-              <span style={{ ...styles.badge, ...sourceBadge.style }}>
-                {sourceBadge.label}
-              </span>
-              {Boolean(was_edited) && (
-                <span style={{ ...styles.badge, ...styles.badgeOutline }}>
-                  재작성
-                </span>
-              )}
-            </>
-          ) : null}
+        {showExperimentMeta && sourceBadge ? (
+          <>
+            <span style={styles.dot} />
+            <span style={{ ...styles.badge, ...sourceBadge.style }}>
+              {sourceBadge.label}
+            </span>
+            {Boolean(was_edited) && (
+              <span style={{ ...styles.badge, ...styles.badgeOutline }}>재작성</span>
+            )}
+          </>
+        ) : null}
         </div>
 
         <div style={styles.headerRight}>
-          {/* 좋아요 */}
           <button
             onClick={handleLike}
             disabled={!isAuthed || inFlight}
@@ -173,7 +178,6 @@ export default function CommentItem({
             👍 좋아요 {like_count}
           </button>
 
-          {/* 싫어요 */}
           <button
             onClick={handleHate}
             disabled={!isAuthed || inFlight}
@@ -188,12 +192,13 @@ export default function CommentItem({
           </button>
 
           <button
-            onClick={() => startReply?.(id, author)}
+            onClick={() => startReply?.(id, nickname || maskUser(user_id))}
             style={{ ...styles.btn, ...styles.btnGhost }}
             title="대댓글 달기"
           >
             답글
           </button>
+
           {canDelete && (
             <button
               onClick={() => onDelete?.(id)}
@@ -207,16 +212,26 @@ export default function CommentItem({
       </div>
 
       <div style={styles.body}>
-        <p style={styles.text}>{displayText}</p>
+        <p style={styles.text}>
+          {isReply && reply_to_name ? (
+            <span
+              className="mention-chip"
+              style={{ color: "var(--muted)", fontWeight: 700, marginRight: 6 }}
+            >
+              @{reply_to_name}
+            </span>
+          ) : null}
+          <span>{displayText}</span>
+        </p>
       </div>
 
-      {replies?.length > 0 && (
+      {Array.isArray(replies) && replies.length > 0 && (
         <div style={styles.children}>
           {replies.map((child) => (
             <CommentItem
               key={child.id}
               comment={child}
-              depth={Math.min(child.depth ?? depth + 1, 6)}
+              depth={1} 
               currentUserId={currentUserId}
               startReply={startReply}
               onDelete={onDelete}
@@ -231,7 +246,7 @@ export default function CommentItem({
   );
 }
 
-// helper
+// 사용자 id 마스킹 
 function maskUser(uid) {
   if (!uid) return "익명";
   const s = String(uid);
@@ -239,11 +254,11 @@ function maskUser(uid) {
   return `u_${s.slice(0, 2)}…${s.slice(-2)}`;
 }
 
-// style
+// 인라인 스타일
 const styles = {
   item: {
     padding: "10px 12px",
-    borderBottom: "1px solid #F3F4F6",
+    borderBottom: "1px solid var(--border)",
   },
   header: {
     display: "flex",
@@ -263,9 +278,9 @@ const styles = {
     gap: 6,
     marginLeft: "auto",
   },
-  author: { fontWeight: 700, color: "#111827" },
-  time: { color: "#6B7280", fontSize: 12 },
-  dot: { width: 4, height: 4, borderRadius: 8, background: "#D1D5DB" },
+  author: { fontWeight: 700, color: "var(--fg)" },
+  time: { color: "var(--muted)", fontSize: 12 },
+  dot: { width: 4, height: 4, borderRadius: 8, background: "var(--border)" },
 
   // badges (운영/디버그 전용)
   badge: {
@@ -274,16 +289,16 @@ const styles = {
     borderRadius: 999,
   },
   badgeOutline: {
-    border: "1px solid #D1D5DB",
-    color: "#374151",
-    background: "white",
+    border: "1px solid var(--border)",
+    color: "var(--fg)",
+    background: "var(--card)",
     marginLeft: 4,
   },
-  badgeDark: { background: "#111827", color: "white" },
-  badgeIndigo: { background: "#EEF2FF", color: "#3730A3" },
+  badgeDark:  { background: "#111827", color: "#fff" },
+  badgeIndigo:{ background: "#EEF2FF", color: "#3730A3" },
   badgeGreen: { background: "#ECFDF5", color: "#065F46" },
-  badgeRed: { background: "#FEF2F2", color: "#991B1B" },
-  badgeGray: { background: "#F3F4F6", color: "#374151" },
+  badgeRed:   { background: "#FEF2F2", color: "#991B1B" },
+  badgeGray:  { background: "#F3F4F6", color: "#374151" },
 
   btn: {
     borderRadius: 8,
@@ -295,44 +310,25 @@ const styles = {
     transition: "opacity .12s ease",
   },
   btnGhost: {
-    background: "white",
-    borderColor: "#E5E7EB",
-    color: "#111827",
+    background: "var(--card)",
+    borderColor: "var(--border)",
+    color: "var(--fg)",
   },
   btnDanger: {
     background: "#DC2626",
-    color: "white",
+    color: "#fff",
     borderColor: "#DC2626",
   },
-  btnDisabled: {
-    cursor: "not-allowed",
-    opacity: 0.7,
-  },
+  btnDisabled: { cursor: "not-allowed", opacity: 0.7 },
 
-  // reactions styles
-  btnLike: {
-    background: "#F3F4F6",
-    borderColor: "#D1D5DB",
-    color: "#111827",
-  },
-  btnLikeActive: {
-    background: "#2563EB",
-    borderColor: "#2563EB",
-    color: "white",
-  },
-  btnHate: {
-    background: "#F3F4F6",
-    borderColor: "#D1D5DB",
-    color: "#111827",
-  },
-  btnHateActive: {
-    background: "#DC2626",
-    borderColor: "#DC2626",
-    color: "white",
-  },
+  // reactions
+  btnLike:       { background: "#F3F4F6", borderColor: "#D1D5DB", color: "var(--fg)" },
+  btnLikeActive: { background: "#2563EB", borderColor: "#2563EB", color: "#fff" },
+  btnHate:       { background: "#F3F4F6", borderColor: "#D1D5DB", color: "var(--fg)" },
+  btnHateActive: { background: "#DC2626", borderColor: "#DC2626", color: "#fff" },
 
   body: { paddingLeft: 2 },
-  text: { margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5, color: "#111827" },
+  text: { margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--fg)" },
 
   children: { marginTop: 6 },
 };
