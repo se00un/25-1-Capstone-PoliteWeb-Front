@@ -18,7 +18,7 @@ console.log("[api] baseURL =", envBase || origin || "(empty)");
 
 const api = axios.create({
   baseURL: envBase || origin || "",
-  timeout: 60000,
+  timeout: 180000,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
@@ -47,33 +47,19 @@ api.interceptors.response.use(
   }
 );
 
-/* =====================
- * Session API
- * ===================== */
+// Session API
 api.getSession = async function getSession() {
   const res = await api.get("/session");
-  return res.data; // { user, post, section } 형태 기대
+  return res.data; 
 };
 
-/* =====================
- * Comments API
- * ===================== */
 
-export async function predictBert({ postId, text, threshold }) {
-  const res = await api.post("/bert/predict", {
-    post_id: Number(postId),
-    text: String(text),
-    threshold: threshold != null ? Number(threshold) : undefined,
-  });
-  // res.data: { text, post_id, policy_mode, threshold_applied, predicted_class, probability, over_threshold }
-  return res.data;
-}
-
+// Comments API
 export async function suggestComment({ postId, section, text }) {
   const res = await api.post("/comments/suggest", {
-    post_id: postId,
-    section,
-    text,
+    post_id: Number(postId),
+    section: Number(section),
+    text: String(text),
   });
   return res.data;
 }
@@ -101,9 +87,8 @@ export async function deleteComment(commentId) {
   return res.data;
 }
 
-/* =====================
- * Intervention Events API
- * ===================== */
+
+// Intervention Events API
 /**
  * POST /intervention-events
  * payload:
