@@ -10,7 +10,7 @@
   --primary: #2563eb;
   --link: #646cff;
   --link-hover: #747bff;
-  --surface: #f8fafc; 
+  --surface: #f8fafc; /* subtle surface (reply bg 등) */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -73,7 +73,7 @@ html, body, #root {
   font-family: sans-serif;
 }
 
-/* ===== Shell elasticity (optional) ===== */
+/* ===== Shell elasticity ===== */
 .app-shell,
 .page-root,
 .section-panel,
@@ -117,13 +117,26 @@ html, body, #root {
   margin: 4px 6px 10px;
 }
 
+.comment-item.reply {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.mention-chip {
+  color: var(--muted);
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+
 /* Scroll area */
 .comments-list {
-  max-height: calc(100dvh - 340px); /* viewport-aware */
+  max-height: calc(100dvh - 340px);
   overflow-y: auto;
-  padding: 4px 8px 150px; /* keep space for composer */
+  padding: 4px 8px 150px;    
   border-radius: 8px;
-  scroll-padding-bottom: 180px;    /* anchor safe space */
+  scroll-padding-bottom: 180px;  
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -157,13 +170,17 @@ html, body, #root {
   color: var(--muted);
 }
 
-/* Scrollbar (optional) */
+/* Scrollbar (theme-aware) */
 .comments-list::-webkit-scrollbar { width: 8px; }
-.comments-list::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 6px; }
+.comments-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
 @media (prefers-color-scheme: dark) {
-  .comments-list::-webkit-scrollbar-thumb { background: #2b3558; }
+  .comments-list::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--border) 80%, transparent);
+  }
 }
-.comments-list:hover::-webkit-scrollbar-thumb { background: #cbd5e1; }
+.comments-list:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--border) 60%, var(--card));
+}
 
 /* Mobile tweaks */
 @media (max-width: 640px) {
@@ -173,11 +190,9 @@ html, body, #root {
   }
 }
 
-/* Primary button helper (used by RewardProgress etc.) */
 .btn-primary {
   background: var(--primary);
   border: 1px solid var(--primary);
   color: #fff;
 }
 .btn-primary:hover { filter: brightness(0.96); }
-
