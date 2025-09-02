@@ -64,6 +64,15 @@ export async function suggestComment({ postId, section, text }) {
   return res.data;
 }
 
+export async function predictBert({ postId, text, threshold }) {
+  const res = await api.post("/bert/predict", {
+    post_id: Number(postId),
+    text: String(text),
+    threshold: threshold != null ? Number(threshold) : undefined,
+  });
+  return res.data;
+}
+
 export async function saveComment(payload) {
   const res = await api.post("/comments", payload);
   return res.data;
