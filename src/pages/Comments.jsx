@@ -1,5 +1,4 @@
 // src/pages/Comments.jsx
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CommentItem from "../components/CommentItem";
 import CommentBox from "../components/CommentBox";
@@ -16,6 +15,10 @@ export default function Comments({ postId, section }) {
   const replyInputRef = useRef(null);
   const [replyTarget, setReplyTarget] = useState(null);
 
+  // 운영/디버그 모드에서만 실험 메타(배지/재작성) 노출
+  const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "")
+    .toLowerCase() === "true";
+
   /** userId 초기화 */
   useEffect(() => {
     let stored = localStorage.getItem("userId");
@@ -31,7 +34,13 @@ export default function Comments({ postId, section }) {
     if (!postId || section == null) return;
     try {
       setLoading(true);
-      const data = await apiFetchComments({ postId, section, sort: "new", page: 1, limit: 200 });
+      const data = await apiFetchComments({
+        postId,
+        section,
+        sort: "new",
+        page: 1,
+        limit: 200,
+      });
       setComments(Array.isArray(data) ? data : []);
     } catch (e) {
       console.warn("[Comments] fetch error:", e?.message || e);
@@ -119,9 +128,15 @@ export default function Comments({ postId, section }) {
           borderRadius: 10,
         }}
       >
-        {loading && <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>불러오는 중…</div>}
+        {loading && (
+          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>
+            불러오는 중…
+          </div>
+        )}
         {!loading && tree.length === 0 && (
-          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>첫 번째 댓글을 남겨보세요!</div>
+          <div style={{ padding: 16, color: "#6B7280", fontSize: 14 }}>
+            첫 번째 댓글을 남겨보세요!
+          </div>
         )}
         {!loading &&
           tree.map((comment) => (
@@ -133,6 +148,7 @@ export default function Comments({ postId, section }) {
               startReply={startReply}
               onDelete={onDelete}
               refresh={load}
+              showExperimentMeta={SHOW_META}  
             />
           ))}
       </div>

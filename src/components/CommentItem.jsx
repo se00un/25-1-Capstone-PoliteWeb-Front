@@ -25,6 +25,7 @@ export default function CommentItem({
   startReply,
   onDelete,
   refresh,
+  showExperimentMeta = false,
 }) {
   const {
     id,
@@ -33,20 +34,23 @@ export default function CommentItem({
     text_original,
     text_generated_polite,
     text_user_edit,
-    final_source,          
-    was_edited,          
+    final_source,
+    was_edited,
     created_at,
     replies = [],
   } = comment;
 
   const author = useMemo(() => maskUser(user_id), [user_id]);
-  const canDelete = useMemo(() => String(currentUserId) === String(user_id), [currentUserId, user_id]);
+  const canDelete = useMemo(
+    () => String(currentUserId) === String(user_id),
+    [currentUserId, user_id]
+  );
 
-  // 표시용 본문: 최종 저장된 텍스트가 우선
-  const displayText = text_final ?? text_user_edit ?? text_generated_polite ?? text_original ?? "";
+  const displayText =
+    text_final ?? text_user_edit ?? text_generated_polite ?? text_original ?? "";
 
-  // 메타 뱃지
   const sourceBadge = useMemo(() => {
+    if (!showExperimentMeta) return null;
     switch (final_source) {
       case "original":
         return { label: "원문", style: styles.badgeDark };
@@ -59,7 +63,7 @@ export default function CommentItem({
       default:
         return { label: "기타", style: styles.badgeGray };
     }
-  }, [final_source]);
+  }, [final_source, showExperimentMeta]);
 
   return (
     <div style={{ ...styles.item, marginLeft: depth * 16 }}>
@@ -70,9 +74,20 @@ export default function CommentItem({
           <time style={styles.time} title={new Date(created_at).toISOString()}>
             {formattedDate(created_at)}
           </time>
-          <span style={styles.dot} />
-          <span style={{ ...styles.badge, ...sourceBadge.style }}>{sourceBadge.label}</span>
-          {Boolean(was_edited) && <span style={{ ...styles.badge, ...styles.badgeOutline }}>재작성</span>}
+
+          {showExperimentMeta && sourceBadge ? (
+            <>
+              <span style={styles.dot} />
+              <span style={{ ...styles.badge, ...sourceBadge.style }}>
+                {sourceBadge.label}
+              </span>
+              {Boolean(was_edited) && (
+                <span style={{ ...styles.badge, ...styles.badgeOutline }}>
+                  재작성
+                </span>
+              )}
+            </>
+          ) : null}
         </div>
 
         <div style={styles.headerRight}>
@@ -105,11 +120,12 @@ export default function CommentItem({
             <CommentItem
               key={child.id}
               comment={child}
-              depth={Math.min((child.depth ?? depth + 1), 6)}
+              depth={Math.min(child.depth ?? depth + 1, 6)}
               currentUserId={currentUserId}
               startReply={startReply}
               onDelete={onDelete}
               refresh={refresh}
+              showExperimentMeta={showExperimentMeta}
             />
           ))}
         </div>
@@ -153,6 +169,8 @@ const styles = {
   author: { fontWeight: 700, color: "#111827" },
   time: { color: "#6B7280", fontSize: 12 },
   dot: { width: 4, height: 4, borderRadius: 8, background: "#D1D5DB" },
+
+  // badges (운영/디버그 전용)
   badge: {
     fontSize: 11,
     padding: "2px 6px",
@@ -193,6 +211,4 @@ const styles = {
   text: { margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5, color: "#111827" },
 
   children: { marginTop: 6 },
-  debug: { marginTop: 8, color: "#6B7280", fontSize: 12 },
-  debugRow: { marginTop: 4 },
 };
