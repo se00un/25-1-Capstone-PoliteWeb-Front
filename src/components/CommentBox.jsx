@@ -1,5 +1,4 @@
 // src/components/CommentBox.jsx
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useExperiment from "../hooks/useExperiment";
 import { suggestComment, saveComment, logInterventionEvent } from "../lib/api";
@@ -30,6 +29,9 @@ export default function CommentBox({
 
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // 새로 추가된 originalLogit 저장용
+  const [originalLogit, setOriginalLogit] = useState(null);
 
   // 2차 시도 관련
   const [secondAttempt, setSecondAttempt] = useState(false);
@@ -100,6 +102,7 @@ export default function CommentBox({
           text_original: originalText,
           text_generated_polite: suggestedText || undefined,
           text_user_edit: text,
+          text_final: text, // 수정된 문장이 최종 저장됨
           parent_comment_id: replyTo || undefined,
         });
         await logInterventionEvent({
@@ -108,6 +111,7 @@ export default function CommentBox({
           article_ord: section,
           temp_uuid: flowUuidRef.current,
           attempt_no: 2,
+          original_logit: originalLogit ?? null,
           threshold_applied: Number(threshold ?? 0),
           generated_polite_text: suggestedText || undefined,
           user_edit_text: text,
@@ -129,6 +133,9 @@ export default function CommentBox({
       setSubmitting(true);
       const s = await suggestComment({ postId, section, text });
 
+      // probability 저장
+      setOriginalLogit(s?.probability ?? null);
+
       if (s.over_threshold === false) {
         // θ 미만 → 원문 저장
         const res = await saveComment({
@@ -136,6 +143,7 @@ export default function CommentBox({
           post_id: postId,
           section,
           text_original: text,
+          text_final: text,
           parent_comment_id: replyTo || undefined,
         });
         await logInterventionEvent({
@@ -144,6 +152,7 @@ export default function CommentBox({
           article_ord: section,
           temp_uuid: flowUuidRef.current,
           attempt_no: 1,
+          original_logit: s?.probability ?? null,
           threshold_applied: Number(s.threshold_applied ?? threshold ?? 0),
           decision_rule_applied: "none",
           final_choice_hint: "original",
@@ -170,6 +179,7 @@ export default function CommentBox({
           article_ord: section,
           temp_uuid: flowUuidRef.current,
           attempt_no: 1,
+          original_logit: s?.probability ?? null,
           threshold_applied: Number(s.threshold_applied ?? threshold ?? 0),
           generated_polite_text: s.polite_text,
           decision_rule_applied: "forced_accept_one_edit",
@@ -195,9 +205,10 @@ export default function CommentBox({
     threshold,
     afterSuccess,
     showToast,
+    originalLogit,
   ]);
 
-  // 팝업 핸들러
+  // 팝업 핸들러 (순화문 그대로 사용)
   const handleUseAsIs = useCallback(async () => {
     if (!suggestedText) return;
     try {
@@ -209,6 +220,7 @@ export default function CommentBox({
         section,
         text_original: originalText,
         text_generated_polite: suggestedText,
+        text_final: suggestedText, 
         parent_comment_id: replyTo || undefined,
       });
       await logInterventionEvent({
@@ -217,6 +229,7 @@ export default function CommentBox({
         article_ord: section,
         temp_uuid: flowUuidRef.current,
         attempt_no: 2,
+        original_logit: originalLogit ?? null, 
         threshold_applied: Number(threshold ?? 0),
         generated_polite_text: suggestedText,
         decision_rule_applied: "forced_accept_one_edit",
@@ -239,9 +252,10 @@ export default function CommentBox({
     threshold,
     afterSuccess,
     showToast,
+    originalLogit,
   ]);
 
-  // 팝업 핸들러
+  // 팝업 핸들러 (순화문 수정 후 등록)
   const handleEditThenSubmit = useCallback(() => {
     if (!suggestedText) return;
     setText(suggestedText);
@@ -270,7 +284,7 @@ export default function CommentBox({
         </button>
       </div>
 
-      {/* 모달들 */}
+      {/* 모달 */}
       <BanModal open={banOpen} onClose={() => setBanOpen(false)} />
       <PoliteModal
         open={politeOpen && !!suggestedText}
