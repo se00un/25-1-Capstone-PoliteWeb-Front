@@ -110,7 +110,7 @@ export default function CommentBox({
         const predEdit = await predictBert({ postId, text: modelInput, threshold });
 
         if (predEdit?.over_threshold) {
-          setProcMsg("부정적 표현이 감지되었습니다. 조금만 기다려주세요 ..."); 
+          setProcMsg("⚠️ 공격적 표현이 감지되었습니다. 조금만 기다려주세요 ..."); 
         } else {
           setProcMsg("댓글 표현 사이트 정책 위반 없음. 제출 처리중 …");
         }
@@ -192,7 +192,7 @@ export default function CommentBox({
       setOriginalLogit(pred?.probability ?? null);
 
       if (pred?.over_threshold) {
-        setProcMsg("부정적 표현이 감지되었습니다. 조금만 기다려주세요 ..."); 
+        setProcMsg("⚠️ 공격적 표현이 감지되었습니다. 조금만 기다려주세요 ..."); 
       } else {
         setProcMsg("댓글 표현 사이트 정책 위반 없음. 제출 처리중…");
       }
