@@ -226,3 +226,4 @@ export async function claimReward(postId) {
 }
 
 export default api;
+export async function predictToxicity(args) { return predictBert(args); }

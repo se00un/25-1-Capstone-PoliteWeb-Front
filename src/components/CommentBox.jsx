@@ -11,6 +11,7 @@ import {
 import BanModal from "./BanModal";
 import PoliteModal from "./PoliteModal";
 import RejectEditModal from "./RejectEditModal";
+import ProcessingModal from "./ProcessingModal"; 
 
 const stripLeadingMention = (s = "") =>
   s.replace(/^\s*@[^\s@]+[\s\u00A0]+/, "");
@@ -41,6 +42,8 @@ export default function CommentBox({
   const [rejectOpen, setRejectOpen] = useState(false);
   const lastEditLogitRef = useRef(null);
   const lastEvaluatedEditTextRef = useRef("");
+  const [procOpen, setProcOpen] = useState(false);
+  const [procMsg, setProcMsg] = useState("");
 
   // 토스트
   const [toast, setToast] = useState(null);
@@ -80,6 +83,7 @@ export default function CommentBox({
       setBanOpen(false);
       setPoliteOpen(false);
       setRejectOpen(false);
+      setProcOpen(false);
       showToast(msg, "success");
       if (onAfterSuccess) {
         await onAfterSuccess(res); 
@@ -99,14 +103,23 @@ export default function CommentBox({
     if (secondAttempt) {
       try {
         setSubmitting(true);
+        setProcOpen(true);  
+        setProcMsg("표현 분석 중…"); 
 
         // 멘션 제거된 텍스트로 판정
         const predEdit = await predictBert({ postId, text: modelInput, threshold });
+
+        if (predEdit?.over_threshold) {
+          setProcMsg("부정적 표현이 감지되었습니다. 조금만 기다려주세요 ..."); 
+        } else {
+          setProcMsg("댓글 표현 사이트 정책 위반 없음. 제출 처리중 …");
+        }
 
         // 수정본이 θ 초과 → 거절 모달
         if (predEdit.over_threshold) {
           lastEditLogitRef.current = predEdit?.probability ?? null;
           lastEvaluatedEditTextRef.current = modelInput;
+          setProcOpen(false); 
           setRejectOpen(true);
           logInterventionEvent({
             user_id: userId,
@@ -137,6 +150,7 @@ export default function CommentBox({
           parent_comment_id: replyTo || undefined,
         });
         if (!res?.saved) {
+          setProcOpen(false);
           showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
           return;
         }
@@ -151,7 +165,7 @@ export default function CommentBox({
           edit_logit: predEdit?.probability ?? null,
           threshold_applied: Number(threshold ?? 0),
           generated_polite_text: suggestedText || undefined,
-          user_edit_text: modelInput,                // ✅ 멘션 제외
+          user_edit_text: modelInput,               
           decision_rule_applied: "forced_accept_one_edit",
           final_choice_hint: "user_edit",
           latency_ms: Math.round(performance.now() - t0Ref.current),
@@ -159,6 +173,7 @@ export default function CommentBox({
 
         return await afterSuccess(res, "수정된 문장으로 등록되었습니다!");
       } catch (e) {
+        setProcOpen(false);
         showToast(e.message || "등록 중 오류가 발생했습니다.", "error");
       } finally {
         setSubmitting(false);
@@ -169,10 +184,18 @@ export default function CommentBox({
     // 1차 시도: 원문 제출
     try {
       setSubmitting(true);
+      setProcOpen(true);
+      setProcMsg("표현 분석 중…"); 
 
       // 먼저 BERT로 원문 logit 확보
       const pred = await predictBert({ postId, text: modelInput, threshold });
       setOriginalLogit(pred?.probability ?? null);
+
+      if (pred?.over_threshold) {
+        setProcMsg("부정적 표현이 감지되었습니다. 조금만 기다려주세요 ..."); 
+      } else {
+        setProcMsg("댓글 표현 사이트 정책 위반 없음. 제출 처리중…");
+      }
 
       // 정책/제안 확인 
       const s = await suggestComment({ postId, section, text: modelInput });
@@ -187,6 +210,7 @@ export default function CommentBox({
           parent_comment_id: replyTo || undefined,
         });
         if (!res?.saved) {
+          setProcOpen(false);
           showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
           return;
         }
@@ -202,11 +226,13 @@ export default function CommentBox({
           final_choice_hint: "original",
           latency_ms: Math.round(performance.now() - t0Ref.current),
         });
+        setProcOpen(false);
         return await afterSuccess(res, "등록되었습니다!");
       }
 
       // A: 차단
       if (s.policy_mode === "block") {
+        setProcOpen(false);
         setBanOpen(true);
         logInterventionEvent({
           user_id: userId,
@@ -229,6 +255,7 @@ export default function CommentBox({
         setOriginalText(modelInput);       
         setSuggestedText(s.polite_text);
         setSecondAttempt(false);
+        setProcOpen(false);
         setPoliteOpen(true);
         logInterventionEvent({
           user_id: userId,
@@ -245,6 +272,7 @@ export default function CommentBox({
         });
       }
     } catch (e) {
+      setProcOpen(false);
       showToast(e.message || "제출 중 오류가 발생했습니다.", "error");
     } finally {
       setSubmitting(false);
@@ -270,6 +298,9 @@ export default function CommentBox({
     if (!suggestedText) return;
     try {
       setSubmitting(true);
+      setProcOpen(true);
+      setProcMsg("제출 처리중…");
+
       setPoliteOpen(false);
       setRejectOpen(false);
 
@@ -283,6 +314,7 @@ export default function CommentBox({
         parent_comment_id: replyTo || undefined,
       });
       if (!res?.saved) {
+        setProcOpen(false);
         showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
         return;
       }
@@ -301,8 +333,10 @@ export default function CommentBox({
         latency_ms: Math.round(performance.now() - t0Ref.current),
       });
 
+      setProcOpen(false);
       return await afterSuccess(res, "순화문으로 등록되었습니다!");
     } catch (e) {
+      setProcOpen(false);
       showToast(e.message || "등록 중 오류가 발생했습니다.", "error");
     } finally {
       setSubmitting(false);
@@ -392,6 +426,8 @@ export default function CommentBox({
         threshold={threshold}
         editLogit={lastEditLogitRef.current ?? undefined}
       />
+
+      <ProcessingModal open={procOpen} message={procMsg} />
 
       {toast && (
         <div

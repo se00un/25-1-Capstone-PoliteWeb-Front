@@ -56,11 +56,7 @@ const IntroPage = () => {
             </li>
             <li>원문이 시스템 기준을 <strong>통과하면 그대로 등록</strong>됩니다.</li>
             <li>
-              기준을 <strong>초과</strong>하면 <strong>댓글은 웹사이트 정책</strong>을 따릅니다:
-              <ul style={{ margin: "6px 0 0 1.1rem", color: "var(--muted)" }}>
-                <li>① 순화문이 등록됨</li>
-                <li>② 댓글이 차단됨</li>
-              </ul>
+              기준을 <strong>초과</strong>하면 <strong>댓글은 웹사이트 정책</strong>에 따라 작동됩니다.
             </li>
             <li>
               처리 중에는 <strong>페이지 이동/새로고침을 하지 말아주세요.</strong> (최대 1분이 소요될 수 있습니다)
