@@ -6,16 +6,11 @@ function trimSlash(s) {
   return typeof s === "string" ? s.replace(/\/+$/g, "") : s;
 }
 
-const envBase = trimSlash(import.meta.env.VITE_API_BASE_URL?.trim());
+const envBase = trimSlash(import.meta.env.VITE_API_BASE?.trim());
 const origin =
   typeof window !== "undefined" && window?.location?.origin
     ? trimSlash(window.location.origin)
     : undefined;
-
-if (!envBase && !origin) {
-  console.warn("[api] VITE_API_BASE_URL 비어있고 window.origin도 없음(SSR/빌드 단계일 수 있음)");
-}
-console.log("[api] baseURL =", envBase || origin || "(empty)");
 
 const api = axios.create({
   baseURL: envBase || origin || "",
@@ -26,38 +21,53 @@ const api = axios.create({
   },
 });
 
-api.interceptors.request.use((config) => {
-  try {
-    // 1) userId를 항상 ASCII로 보장해 헤더로만 전송
-    const uid = ensureAsciiUserId();
-    if (uid) config.headers["X-User-Id"] = String(uid);
-
-    // 2) 혹시 다른 곳에서 한글/이모지 헤더를 넣었다면 제거 
-    const unsafeKeys = ["X-Nickname", "X-Display-Name", "X-Email"];
-    unsafeKeys.forEach((k) => {
-      if (k in config.headers) delete config.headers[k];
-    });
-
-    // 3) 남아있는 헤더 값 중 비ASCII가 있으면 삭제
-    for (const [k, v] of Object.entries(config.headers)) {
-      const val = String(v ?? "");
-      if (!/^[\x00-\x7F]*$/.test(val)) {
-        delete config.headers[k];
-      }
+function sanitizeHeaders(headers) {
+  for (const [k,v] of Object.entries(headers)){
+    const val = String(v ?? "");
+    if (!/^[\x00-\x7F]*$/.test(val)) {  
+      console.warn("[api] drop non-ascii header:", k, val);
+      delete headers[k];
     }
-  } catch {}
+  }
+}
+
+api.interceptors.request.use((config) => {
+  const uid = ensureAsciiUserId();
+  config.headers = config
+  config.headers["X-User-Id"] = String(uid);
+
+  config.headers["Cache-Control"] = "noo-store"
+  config.hedaers["Pragma"] = "no-cache"
+
+  sanitizeHeaders(config.headers);
   return config;
 });
 
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    const msg =
+  async (err) => {
+    const msg = err?.message || "";
+    const isIsoErr = /non\s+ISO-8859-1/i.test(msg) || /setRequestHeader/i.test(msg);
+    const cfg = err?.config || {};
+    if (isIsoErr && !cfg.__retried_iso_fix) {
+      cfg.__retried_iso_fix = true;
+      // 로컬 userId 재발급 후 헤더 교체
+      const newUid = resetUserId();
+      cfg.headers = cfg.headers || {};
+      cfg.headers["X-User-Id"] = newUid;
+      sanitizeHeaders(cfg.headers);
+      try {
+        return await api.request(cfg);
+      } catch (e) {
+        // fallthrough to below
+      }
+    }
+    const friendly =
       err?.response?.data?.message ||
       err?.response?.data?.detail ||
-      err?.message ||
+      msg ||
       "Unexpected error";
-    return Promise.reject(new Error(msg));
+    return Promise.reject(new Error(friendly));
   }
 );
 
