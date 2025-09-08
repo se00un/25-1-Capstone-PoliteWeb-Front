@@ -1,6 +1,5 @@
 // src/lib/api.js
 import axios from "axios";
-import { ensureAsciiNumericUserId, resetUserId } from "./userId";
 
 function trimSlash(s) {
   return typeof s === "string" ? s.replace(/\/+$/g, "") : s;
@@ -21,64 +20,31 @@ const api = axios.create({
   },
 });
 
-function sanitizeHeaders(headers) {
-  for (const [k, v] of Object.entries(headers)) {
-    const val = String(v ?? "");
-    if (!/^[\x00-\x7F]*$/.test(val)) {
-      console.warn("[api] drop non-ascii header:", k, val);
-      delete headers[k];
-    }
-  }
-}
-
 api.interceptors.request.use((config) => {
-  const uid = ensureAsciiNumericUserId();
   config.headers = config.headers || {};
-  config.headers["X-User-Id"] = String(uid);
-
-  // no-cache for sensitive flows
   config.headers["Cache-Control"] = "no-store";
   config.headers["Pragma"] = "no-cache";
-
-  sanitizeHeaders(config.headers);
   return config;
 });
 
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
-    const msg = err?.message || "";
-    const isIsoErr =
-      /non\s+ISO-8859-1/i.test(msg) || /setRequestHeader/i.test(msg);
-    const cfg = err?.config || {};
-    if (isIsoErr && !cfg.__retried_iso_fix) {
-      cfg.__retried_iso_fix = true;
-      const newUid = resetUserId();
-      cfg.headers = cfg.headers || {};
-      cfg.headers["X-User-Id"] = newUid;
-      sanitizeHeaders(cfg.headers);
-      try {
-        return await api.request(cfg);
-      } catch (e) {
-        /* fallthrough */
-      }
-    }
     const friendly =
       err?.response?.data?.message ||
       err?.response?.data?.detail ||
-      msg ||
+      err?.message ||
       "Unexpected error";
     return Promise.reject(new Error(friendly));
   }
 );
 
-// Session API
+
 api.getSession = async function getSession() {
   const res = await api.get("/session");
   return res.data;
 };
 
-// Comments API
 export async function suggestComment({ postId, section, text }) {
   const res = await api.post("/comments/suggest", {
     post_id: Number(postId),
@@ -102,16 +68,8 @@ export async function saveComment(payload) {
   return res.data;
 }
 
-export async function fetchComments({
-  postId,
-  section,
-  sort = "new",
-  page = 1,
-  limit = 200,
-}) {
-  const res = await api.get("/comments", {
-    params: { post_id: postId, section, sort, page, limit },
-  });
+export async function fetchComments({ postId, section, sort = "new", page = 1, limit = 200 }) {
+  const res = await api.get("/comments", { params: { post_id: postId, section, sort, page, limit } });
   return res.data;
 }
 
@@ -120,7 +78,6 @@ export async function deleteComment(commentId) {
   return res.data;
 }
 
-// Intervention Events API
 export async function logInterventionEvent(payload) {
   try {
     const safe = {
@@ -129,25 +86,16 @@ export async function logInterventionEvent(payload) {
       article_ord: Number(payload.article_ord ?? payload.section),
       temp_uuid: payload.temp_uuid ?? null,
       attempt_no: Number(payload.attempt_no ?? 1),
-      original_logit:
-        payload.original_logit != null
-          ? parseFloat(payload.original_logit)
-          : null,
-      threshold_applied:
-        payload.threshold_applied != null
-          ? parseFloat(payload.threshold_applied)
-          : null,
+      original_logit: payload.original_logit != null ? parseFloat(payload.original_logit) : null,
+      threshold_applied: payload.threshold_applied != null ? parseFloat(payload.threshold_applied) : null,
       action_applied: payload.action_applied ?? "none",
       generated_polite_text: payload.generated_polite_text ?? null,
       user_edit_text: payload.user_edit_text ?? null,
-      edit_logit:
-        payload.edit_logit != null ? parseFloat(payload.edit_logit) : null,
+      edit_logit: payload.edit_logit != null ? parseFloat(payload.edit_logit) : null,
       decision_rule_applied: payload.decision_rule_applied ?? "none",
       final_choice_hint: payload.final_choice_hint ?? "unknown",
-      latency_ms:
-        payload.latency_ms != null ? Number(payload.latency_ms) : null,
+      latency_ms: payload.latency_ms != null ? Number(payload.latency_ms) : null,
     };
-
     const res = await api.post("/intervention-events", safe);
     return res.data;
   } catch (e) {
@@ -156,7 +104,6 @@ export async function logInterventionEvent(payload) {
   }
 }
 
-// reaction API
 export async function toggleLike(commentId) {
   const user_id = localStorage.getItem("userId");
   if (!user_id) throw new Error("로그인이 필요합니다");
@@ -173,67 +120,41 @@ export async function toggleHate(commentId) {
 
 export async function fetchReactionsBatch(commentIds = []) {
   const user_id = localStorage.getItem("userId");
-  if (!user_id || !Array.isArray(commentIds) || commentIds.length === 0)
-    return [];
-  const res = await api.post(`/comments/reactions/batch`, {
-    user_id,
-    comment_ids: commentIds,
-  });
+  if (!user_id || !Array.isArray(commentIds) || commentIds.length === 0) return [];
+  const res = await api.post(`/comments/reactions/batch`, { user_id, comment_ids: commentIds });
   return res.data || [];
 }
 
-// Experiment Meta API
 export async function getExperimentMeta({ postId, section }) {
   try {
-    const res = await api.get("/intervention-events/meta", {
-      params: { post_id: postId, section },
-    });
+    const res = await api.get("/intervention-events/meta", { params: { post_id: postId, section } });
     return res.data;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
-// reward API (process)
 export async function fetchRewardEligibility(postId) {
   const user_id = localStorage.getItem("userId");
   if (!user_id) throw new Error("로그인이 필요합니다");
 
-  const res = await api.post("/rewards/eligibility", {
-    user_id: Number(user_id),
-    post_id: Number(postId),
-  });
-
+  const res = await api.post("/rewards/eligibility", { user_id: Number(user_id), post_id: Number(postId) });
   const data = res.data || {};
   const c = data.per_section_counts || {};
-
-  const per_section_counts = {
-    1: Number(c[1] ?? c["1"] ?? 0),
-    2: Number(c[2] ?? c["2"] ?? 0),
-    3: Number(c[3] ?? c["3"] ?? 0),
-  };
-
+  const per_section_counts = { 1: Number(c[1] ?? c["1"] ?? 0), 2: Number(c[2] ?? c["2"] ?? 0), 3: Number(c[3] ?? c["3"] ?? 0) };
   return {
     eligible: !!data.eligible,
     already_claimed: !!data.already_claimed,
     per_section_counts,
-    total_count:
-      data.total_count != null
-        ? Number(data.total_count)
-        : per_section_counts[1] + per_section_counts[2] + per_section_counts[3],
+    total_count: data.total_count != null ? Number(data.total_count) : per_section_counts[1] + per_section_counts[2] + per_section_counts[3],
   };
 }
 
-// reward API (claim)
 export async function claimReward(postId) {
   const user_id = localStorage.getItem("userId");
   if (!user_id) throw new Error("로그인이 필요합니다");
 
-  const res = await api.post("/rewards/claim", {
-    user_id: Number(user_id),
-    post_id: Number(postId),
-  });
-
+  const res = await api.post("/rewards/claim", { user_id: Number(user_id), post_id: Number(postId) });
   const data = res.data || {};
   return {
     ok: !!(data.granted || data.already_claimed),
@@ -245,7 +166,4 @@ export async function claimReward(postId) {
 }
 
 export default api;
-export async function predictToxicity(args) {
-  return predictBert(args);
-}
-
+export async function predictToxicity(args) { return predictBert(args); }
