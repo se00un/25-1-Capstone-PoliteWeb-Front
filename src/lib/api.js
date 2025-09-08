@@ -1,5 +1,6 @@
 // src/lib/api.js
 import axios from "axios";
+import { ensureAsciiUserId } from "./userId";
 
 function trimSlash(s) {
   return typeof s === "string" ? s.replace(/\/+$/g, "") : s;
@@ -27,11 +28,24 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   try {
-    const userId =
-      typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-    if (userId) config.headers["X-User-Id"] = userId;
-  } catch {
-  }
+    // 1) userId를 항상 ASCII로 보장해 헤더로만 전송
+    const uid = ensureAsciiUserId();
+    if (uid) config.headers["X-User-Id"] = String(uid);
+
+    // 2) 혹시 다른 곳에서 한글/이모지 헤더를 넣었다면 제거 
+    const unsafeKeys = ["X-Nickname", "X-Display-Name", "X-Email"];
+    unsafeKeys.forEach((k) => {
+      if (k in config.headers) delete config.headers[k];
+    });
+
+    // 3) 남아있는 헤더 값 중 비ASCII가 있으면 삭제
+    for (const [k, v] of Object.entries(config.headers)) {
+      const val = String(v ?? "");
+      if (!/^[\x00-\x7F]*$/.test(val)) {
+        delete config.headers[k];
+      }
+    }
+  } catch {}
   return config;
 });
 
@@ -50,9 +64,8 @@ api.interceptors.response.use(
 // Session API
 api.getSession = async function getSession() {
   const res = await api.get("/session");
-  return res.data; 
+  return res.data;
 };
-
 
 // Comments API
 export async function suggestComment({ postId, section, text }) {
@@ -95,7 +108,6 @@ export async function deleteComment(commentId) {
   const res = await api.delete(`/comments/${commentId}`);
   return res.data;
 }
-
 
 // Intervention Events API
 /**
@@ -161,7 +173,6 @@ export async function fetchReactionsBatch(commentIds = []) {
   });
   return res.data || [];
 }
-
 
 // Experiment Meta API
 export async function getExperimentMeta({ postId, section }) {
