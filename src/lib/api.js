@@ -1,12 +1,12 @@
 // src/lib/api.js
 import axios from "axios";
-import { ensureAsciiNumericUserId } from "./userId";
+import { ensureAsciiNumericUserId, resetUserId } from "./userId";
 
 function trimSlash(s) {
   return typeof s === "string" ? s.replace(/\/+$/g, "") : s;
 }
 
-const envBase = trimSlash(import.meta.env.VITE_API_BASE?.trim());
+const envBase = trimSlash(import.meta.env.VITE_API_BASE_URL?.trim());
 const origin =
   typeof window !== "undefined" && window?.location?.origin
     ? trimSlash(window.location.origin)
@@ -22,9 +22,9 @@ const api = axios.create({
 });
 
 function sanitizeHeaders(headers) {
-  for (const [k,v] of Object.entries(headers)){
+  for (const [k, v] of Object.entries(headers)) {
     const val = String(v ?? "");
-    if (!/^[\x00-\x7F]*$/.test(val)) {  
+    if (!/^[\x00-\x7F]*$/.test(val)) {
       console.warn("[api] drop non-ascii header:", k, val);
       delete headers[k];
     }
@@ -32,12 +32,13 @@ function sanitizeHeaders(headers) {
 }
 
 api.interceptors.request.use((config) => {
-  const uid = ensureAsciiUserId();
-  config.headers = config
+  const uid = ensureAsciiNumericUserId();
+  config.headers = config.headers || {};
   config.headers["X-User-Id"] = String(uid);
 
-  config.headers["Cache-Control"] = "noo-store"
-  config.hedaers["Pragma"] = "no-cache"
+  // no-cache for sensitive flows
+  config.headers["Cache-Control"] = "no-store";
+  config.headers["Pragma"] = "no-cache";
 
   sanitizeHeaders(config.headers);
   return config;
@@ -47,11 +48,11 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const msg = err?.message || "";
-    const isIsoErr = /non\s+ISO-8859-1/i.test(msg) || /setRequestHeader/i.test(msg);
+    const isIsoErr =
+      /non\s+ISO-8859-1/i.test(msg) || /setRequestHeader/i.test(msg);
     const cfg = err?.config || {};
     if (isIsoErr && !cfg.__retried_iso_fix) {
       cfg.__retried_iso_fix = true;
-      // 로컬 userId 재발급 후 헤더 교체
       const newUid = resetUserId();
       cfg.headers = cfg.headers || {};
       cfg.headers["X-User-Id"] = newUid;
@@ -59,7 +60,7 @@ api.interceptors.response.use(
       try {
         return await api.request(cfg);
       } catch (e) {
-        // fallthrough to below
+        /* fallthrough */
       }
     }
     const friendly =
@@ -120,14 +121,6 @@ export async function deleteComment(commentId) {
 }
 
 // Intervention Events API
-/**
- * POST /intervention-events
- * payload:
- * { user_id, post_id, article_ord, temp_uuid, attempt_no,
- *   original_logit, threshold_applied, action_applied,
- *   generated_polite_text, user_edit_text, edit_logit,
- *   decision_rule_applied, final_choice_hint, latency_ms }
- */
 export async function logInterventionEvent(payload) {
   try {
     const safe = {
@@ -136,19 +129,23 @@ export async function logInterventionEvent(payload) {
       article_ord: Number(payload.article_ord ?? payload.section),
       temp_uuid: payload.temp_uuid ?? null,
       attempt_no: Number(payload.attempt_no ?? 1),
-
-      original_logit: payload.original_logit != null ? parseFloat(payload.original_logit) : null,
-      threshold_applied: payload.threshold_applied != null ? parseFloat(payload.threshold_applied) : null,
+      original_logit:
+        payload.original_logit != null
+          ? parseFloat(payload.original_logit)
+          : null,
+      threshold_applied:
+        payload.threshold_applied != null
+          ? parseFloat(payload.threshold_applied)
+          : null,
       action_applied: payload.action_applied ?? "none",
-
       generated_polite_text: payload.generated_polite_text ?? null,
       user_edit_text: payload.user_edit_text ?? null,
-      edit_logit: payload.edit_logit != null ? parseFloat(payload.edit_logit) : null,
-
+      edit_logit:
+        payload.edit_logit != null ? parseFloat(payload.edit_logit) : null,
       decision_rule_applied: payload.decision_rule_applied ?? "none",
       final_choice_hint: payload.final_choice_hint ?? "unknown",
-
-      latency_ms: payload.latency_ms != null ? Number(payload.latency_ms) : null,
+      latency_ms:
+        payload.latency_ms != null ? Number(payload.latency_ms) : null,
     };
 
     const res = await api.post("/intervention-events", safe);
@@ -176,7 +173,8 @@ export async function toggleHate(commentId) {
 
 export async function fetchReactionsBatch(commentIds = []) {
   const user_id = localStorage.getItem("userId");
-  if (!user_id || !Array.isArray(commentIds) || commentIds.length === 0) return [];
+  if (!user_id || !Array.isArray(commentIds) || commentIds.length === 0)
+    return [];
   const res = await api.post(`/comments/reactions/batch`, {
     user_id,
     comment_ids: commentIds,
@@ -247,4 +245,7 @@ export async function claimReward(postId) {
 }
 
 export default api;
-export async function predictToxicity(args) { return predictBert(args); }
+export async function predictToxicity(args) {
+  return predictBert(args);
+}
+
