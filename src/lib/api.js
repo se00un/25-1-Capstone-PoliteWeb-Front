@@ -1,6 +1,6 @@
 // src/lib/api.js
 import axios from "axios";
-import { ensureAsciiUserId } from "./userId";
+import { ensureAsciiNumericUserId } from "./userId";
 
 function trimSlash(s) {
   return typeof s === "string" ? s.replace(/\/+$/g, "") : s;
