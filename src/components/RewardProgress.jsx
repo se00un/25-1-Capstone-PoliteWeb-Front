@@ -1,22 +1,34 @@
-// src/components/RewardProgress.jsx
-
+// src/components/RewardProgress.jsx  
 import React, { useMemo } from "react";
 
 export default function RewardProgress({
   counts = { 1: 0, 2: 0, 3: 0 },
-  capBySection = { 1: 0, 2: 0, 3: 0 }, // 각 섹션 0~3
-  overflowBySection = { 1: 0, 2: 0, 3: 0 },
   required = { total: 9, perSection: 3 },
   stage = "not_eligible", // 'not_eligible' | 'eligible' | 'claimed'
-  progress = 0, // 0~1
-  filled = 0,   // 0~9
   onOpenModal,
 }) {
+  const derived = useMemo(() => {
+    const s1 = Number(counts[1] || 0), s2 = Number(counts[2] || 0), s3 = Number(counts[3] || 0);
+    const cap = {
+      1: Math.min(s1, required.perSection),
+      2: Math.min(s2, required.perSection),
+      3: Math.min(s3, required.perSection),
+    };
+    const overflow = {
+      1: Math.max(0, s1 - required.perSection),
+      2: Math.max(0, s2 - required.perSection),
+      3: Math.max(0, s3 - required.perSection),
+    };
+    const filled = Math.min(cap[1] + cap[2] + cap[3], required.total);
+    const progress = filled / required.total;
+    return { cap, overflow, filled, progress };
+  }, [counts, required]);
+
   const H = 180; // 바 전체 높이(px)
   const unit = H / required.total; // 한 칸 높이
-  const h1 = capBySection[1] * unit;
-  const h2 = capBySection[2] * unit;
-  const h3 = capBySection[3] * unit;
+  const h1 = derived.cap[1] * unit;
+  const h2 = derived.cap[2] * unit;
+  const h3 = derived.cap[3] * unit;
 
   const statusText = useMemo(() => {
     if (stage === "claimed") return "실험 보상 수령 완료";
@@ -28,7 +40,6 @@ export default function RewardProgress({
     <div style={wrap}>
       <div style={leftCol}>
         <div style={{ ...bar, height: H }}>
-          {/* 가이드 라인(3/6/9) */}
           {[3, 6, 9].map((mark) => (
             <div
               key={mark}
@@ -42,20 +53,12 @@ export default function RewardProgress({
               }}
             />
           ))}
-
-          {/* 스택: 섹션1(바닥) → 섹션2 → 섹션3 */}
           <div style={{ ...seg, height: h1, background: "#6366F1" }} />
           <div style={{ ...seg, height: h2, background: "#10B981" }} />
           <div style={{ ...seg, height: h3, background: "#F59E0B" }} />
-
-          {stage === "claimed" && (
-            <div style={ribbon}>CLAIMED</div>
-          )}
+          {stage === "claimed" && <div style={ribbon}>CLAIMED</div>}
         </div>
-
-        <div style={totalLabel}>
-          총 {filled}/{required.total}
-        </div>
+        <div style={totalLabel}>총 {derived.filled}/{required.total}</div>
       </div>
 
       <div style={rightCol}>
@@ -67,9 +70,9 @@ export default function RewardProgress({
         <div style={status}>{statusText}</div>
 
         <div style={legend}>
-          <LegendItem color="#6366F1" label="섹션 1" value={counts[1]} req={required.perSection} overflow={overflowBySection[1]} />
-          <LegendItem color="#10B981" label="섹션 2" value={counts[2]} req={required.perSection} overflow={overflowBySection[2]} />
-          <LegendItem color="#F59E0B" label="섹션 3" value={counts[3]} req={required.perSection} overflow={overflowBySection[3]} />
+          <LegendItem color="#6366F1" label="섹션 1" value={counts[1]} req={required.perSection} overflow={derived.overflow[1]} />
+          <LegendItem color="#10B981" label="섹션 2" value={counts[2]} req={required.perSection} overflow={derived.overflow[2]} />
+          <LegendItem color="#F59E0B" label="섹션 3" value={counts[3]} req={required.perSection} overflow={derived.overflow[3]} />
         </div>
       </div>
     </div>
@@ -110,9 +113,7 @@ const bar = {
   flexDirection: "column-reverse",
 };
 
-const seg = {
-  width: "100%",
-};
+const seg = { width: "100%" };
 
 const ribbon = {
   position: "absolute",

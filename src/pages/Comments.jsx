@@ -1,9 +1,15 @@
-// src/pages/Comments.jsx
+// src/pages/Comments.jsx  
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CommentItem from "../components/CommentItem";
 import CommentBox from "../components/CommentBox";
-import { fetchComments as apiFetchComments, deleteComment as apiDeleteComment, fetchReactionsBatch } from "../lib/api";
+import RewardModal from "../components/RewardModal";
+import RewardProgress from "../components/RewardProgress";
+import {
+  fetchComments as apiFetchComments,
+  deleteComment as apiDeleteComment,
+  fetchReactionsBatch,
+} from "../lib/api";
 
 export default function Comments({ postId, section, onAfterChange }) {
   const [userId, setUserId] = useState("");
@@ -13,7 +19,13 @@ export default function Comments({ postId, section, onAfterChange }) {
   const replyInputRef = useRef(null);
   const [replyTarget, setReplyTarget] = useState(null);
 
-  const SHOW_META = String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "").toLowerCase() === "true";
+  const SHOW_META =
+    String(import.meta.env.VITE_SHOW_EXPERIMENT_META || "").toLowerCase() === "true";
+
+  const [rewardOpen, setRewardOpen] = useState(false);
+  const [rewardStage, setRewardStage] = useState("not_eligible"); // 'not_eligible' | 'eligible' | 'claimed'
+  const [counts, setCounts] = useState({ 1: 0, 2: 0, 3: 0 });
+  const required = useMemo(() => ({ total: 9, perSection: 3 }), []);
 
   // user ID
   useEffect(() => {
@@ -25,12 +37,18 @@ export default function Comments({ postId, section, onAfterChange }) {
     setUserId(stored);
   }, []);
 
-  // load comments
+  // load comments (현재 섹션)
   const load = useCallback(async () => {
     if (!postId || section == null) return;
     try {
       setLoading(true);
-      const data = await apiFetchComments({ postId, section, sort: "new", page: 1, limit: 200 });
+      const data = await apiFetchComments({
+        postId,
+        section,
+        sort: "new",
+        page: 1,
+        limit: 200,
+      });
       const base = (Array.isArray(data) ? data : []).map((c) => ({
         ...c,
         like_count: c.like_count ?? 0,
@@ -71,7 +89,9 @@ export default function Comments({ postId, section, onAfterChange }) {
     }
   }, [postId, section, userId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // window focus → refresh
   useEffect(() => {
@@ -100,7 +120,7 @@ export default function Comments({ postId, section, onAfterChange }) {
       try {
         await apiDeleteComment(commentId);
         await load();
-        onAfterChange?.(); 
+        onAfterChange?.();
       } catch (e) {
         alert(e?.message || "삭제 중 오류가 발생했습니다.");
       }
@@ -112,10 +132,85 @@ export default function Comments({ postId, section, onAfterChange }) {
     setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }, []);
 
+  
+  // Reward: 섹션별/총합 카운트 계산(클라이언트) + 1회 자동 팝업
+  const computeCountsFor = useCallback((list, me) => {
+    const by = { 1: 0, 2: 0, 3: 0 };
+    const uid = String(me || "");
+    list.forEach((c) => {
+      if (String(c.user_id) === uid) {
+        const s = Number(c.section ?? c.article_ord ?? 0);
+        if (s === 1 || s === 2 || s === 3) by[s] += 1;
+      }
+    });
+    return by;
+  }, []);
+
+  const loadAllCounts = useCallback(async () => {
+    if (!postId || !userId) return;
+    try {
+      const [s1, s2, s3] = await Promise.all([
+        apiFetchComments({ postId, section: 1, sort: "new", page: 1, limit: 200 }),
+        apiFetchComments({ postId, section: 2, sort: "new", page: 1, limit: 200 }),
+        apiFetchComments({ postId, section: 3, sort: "new", page: 1, limit: 200 }),
+      ]);
+      const c1 = computeCountsFor(Array.isArray(s1) ? s1 : [], userId);
+      const c2 = computeCountsFor(Array.isArray(s2) ? s2 : [], userId);
+      const c3 = computeCountsFor(Array.isArray(s3) ? s3 : [], userId);
+
+      // 안전 합산(혹시라도 섹션 키 혼재 대비)
+      const by = {
+        1: (c1[1] || 0) + (c2[1] || 0) + (c3[1] || 0),
+        2: (c1[2] || 0) + (c2[2] || 0) + (c3[2] || 0),
+        3: (c1[3] || 0) + (c2[3] || 0) + (c3[3] || 0),
+      };
+      setCounts(by);
+
+      const perOK =
+        by[1] >= required.perSection &&
+        by[2] >= required.perSection &&
+        by[3] >= required.perSection;
+      const totalOK = by[1] + by[2] + by[3] >= required.total;
+      const eligible = perOK && totalOK;
+
+      const key = `reward_claimed:${postId}:${userId}`;
+      const claimed = localStorage.getItem(key) === "1";
+      const stage = claimed ? "claimed" : eligible ? "eligible" : "not_eligible";
+      setRewardStage(stage);
+
+      if (!claimed && eligible) setRewardOpen(true);
+    } catch (e) {
+      console.warn("[Reward] count load fail:", e?.message || e);
+    }
+  }, [postId, userId, required, computeCountsFor]);
+
+  useEffect(() => {
+    loadAllCounts();
+  }, [loadAllCounts]);
+
+  const openReward = useCallback(() => setRewardOpen(true), []);
+  const closeReward = useCallback(() => {
+    if (userId && postId) {
+      localStorage.setItem(`reward_claimed:${postId}:${userId}`, "1");
+    }
+    setRewardStage("claimed");
+    setRewardOpen(false);
+  }, [postId, userId]);
+
   return (
     <div className="comments-root">
       <section className="comments-shell">
         <div className="comments-header">섹션 {section} 댓글</div>
+
+        {/* 진행도/보상 영역 */}
+        <div style={{ margin: "8px 0" }}>
+          <RewardProgress
+            counts={counts}
+            required={required}
+            stage={rewardStage}
+            onOpenModal={openReward}
+          />
+        </div>
 
         <div className="comments-list">
           {loading && <div className="comments-empty">불러오는 중…</div>}
@@ -139,11 +234,10 @@ export default function Comments({ postId, section, onAfterChange }) {
               />
             ))}
 
-          {/* 대댓글 입력 위치 앵커 */}
           {replyTarget && <div ref={replyInputRef} />}
         </div>
 
-        {/* 작성창: 하단 고정 */}
+        {/* 작성창 */}
         <div className="composer-sticky">
           <CommentBox
             userId={userId}
@@ -151,7 +245,8 @@ export default function Comments({ postId, section, onAfterChange }) {
             section={section}
             onAfterSuccess={async () => {
               await load();
-              onAfterChange?.(); // ← 부모(페이지)에게 알림
+              onAfterChange?.();
+              await loadAllCounts(); // 새 댓글 후 카운트 갱신
             }}
             replyTo={replyTarget?.id || null}
             prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
@@ -164,6 +259,15 @@ export default function Comments({ postId, section, onAfterChange }) {
             </div>
           )}
         </div>
+
+        {/* 보상 안내 모달 (Env 기반) */}
+        <RewardModal
+          open={rewardOpen}
+          onClose={closeReward}
+          stage={rewardStage}
+          counts={counts}
+          required={required}
+        />
       </section>
     </div>
   );
@@ -194,14 +298,14 @@ function buildCommentTree(flat) {
     if (pid) {
       const parent = map[pid];
       if (parent) {
-        node.depth = 1; 
+        node.depth = 1;
         node.reply_to_name = parent.nickname || parent.user_nickname || maskUser(parent.user_id);
         parent.replies.push(node);
       } else {
         roots.push(node);
       }
     } else {
-      roots.push(node); 
+      roots.push(node);
     }
   });
 

@@ -1,22 +1,19 @@
 // src/components/RewardModal.jsx
-
 import React from "react";
 
 export default function RewardModal({
   open,
   onClose,
-  stage = "not_eligible",         
+  stage = "not_eligible", // 'not_eligible' | 'eligible' | 'claimed'
   counts = { 1: 0, 2: 0, 3: 0 },
   required = { total: 9, perSection: 3 },
-  claiming = false,
-  onClaim,                        
-  openchatUrl = null,
-  openchatPw = null,
 }) {
   if (!open) return null;
 
   const isEligible = stage === "eligible";
   const isClaimed = stage === "claimed";
+  const openchatUrl = import.meta.env.VITE_REWARD_OPENCHAT_URL?.trim() || null;
+  const openchatPw = import.meta.env.VITE_REWARD_OPENCHAT_PW?.trim() || null;
 
   return (
     <div style={backdrop} onClick={onClose}>
@@ -37,28 +34,20 @@ export default function RewardModal({
           </div>
         </div>
 
-        {!isClaimed && (
-          <div style={ctaRow}>
-            <button
-              onClick={onClaim}
-              disabled={!isEligible || claiming}
-              style={{
-                ...btnPrimary,
-                ...(isEligible && !claiming ? {} : btnDisabled),
-              }}
-            >
-              {claiming ? "처리 중…" : isEligible ? "보상 받기" : "조건 미달"}
-            </button>
-          </div>
-        )}
-
-        {isClaimed && (
+        {(isEligible || isClaimed) && (
           <div style={grantBox}>
-            <div style={{ fontWeight: 700, marginBottom: 6, color: "#111827" }}>수령 완료 🎉</div>
-            <div style={kv}><span style={k}>오픈채팅 링크</span><a href={openchatUrl || "#"} target="_blank" rel="noreferrer" style={vLink}>{openchatUrl || "-"}</a></div>
+            <div style={{ fontWeight: 700, marginBottom: 6, color: "#111827" }}>
+              {isClaimed ? "수령 완료 🎉" : "수령 안내"}
+            </div>
+            <div style={kv}>
+              <span style={k}>오픈채팅 링크</span>
+              <a href={openchatUrl || "#"} target="_blank" rel="noreferrer" style={vLink}>
+                {openchatUrl || "-"}
+              </a>
+            </div>
             <div style={kv}><span style={k}>입장 비밀번호</span><span style={v}>{openchatPw || "-"}</span></div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>
-              링크/비밀번호는 언제든 이 팝업에서 다시 확인할 수 있어요.
+              안내용 정보입니다. 
             </div>
           </div>
         )}
@@ -108,19 +97,6 @@ const btnClose = {
 };
 
 const section = { marginTop: 12 };
-
-const ctaRow = { marginTop: 14, display: "flex", justifyContent: "center" };
-const btnPrimary = {
-  background: "#111827",
-  color: "white",
-  border: "1px solid #111827",
-  padding: "10px 16px",
-  borderRadius: 10,
-  cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 800,
-};
-const btnDisabled = { opacity: 0.6, cursor: "not-allowed" };
 
 const grantBox = {
   marginTop: 14,

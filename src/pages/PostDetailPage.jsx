@@ -7,13 +7,12 @@ import Comments from "./Comments";
 import SectionPicker from "../components/SectionPicker";
 import { sectionTemplates } from "../sections/templates";
 
-import useReward from "../hooks/useReward";
 import RewardProgress from "../components/RewardProgress";
 import RewardModal from "../components/RewardModal";
 
 export default function PostDetailPage() {
   const { id } = useParams();
-  const { state } = useLocation(); 
+  const { state } = useLocation();
   const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
   const [post, setPost] = useState(null);
@@ -21,8 +20,20 @@ export default function PostDetailPage() {
   const [currentSection, setCurrentSection] = useState(1);
   const [error, setError] = useState("");
 
-  const reward = useReward(id);
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
+  const [rewardStage, setRewardStage] = useState("not_eligible"); // 'not_eligible' | 'eligible' | 'claimed'
+  const [counts, setCounts] = useState({ 1: 0, 2: 0, 3: 0 });
+  const required = useMemo(() => ({ total: 9, perSection: 3 }), []);
+
+  const [userId, setUserId] = useState("");
+  useEffect(() => {
+    let stored = localStorage.getItem("userId");
+    if (!stored) {
+      stored = String(Math.floor(Math.random() * 9e9 + 1e9));
+      localStorage.setItem("userId", stored);
+    }
+    setUserId(stored);
+  }, []);
 
   const load = useCallback(async () => {
     if (!state?.password) {
@@ -85,19 +96,64 @@ export default function PostDetailPage() {
     }
   }, [sectionNumbers, currentSection]);
 
-  // 보상 상태 로드/자동 팝업
-  useEffect(() => {
-    if (id && currentSection != null) reward.loadStatus();
-  }, [id, currentSection]);
-  useEffect(() => {
-    if (reward.openOnceIfEligible()) setRewardModalOpen(true);
-  }, [reward.stage, reward.filled]);
+  // Reward 계산
+  const computeCountsFor = useCallback((list, me) => {
+    const by = { 1: 0, 2: 0, 3: 0 };
+    const uid = String(me || "");
+    (Array.isArray(list) ? list : []).forEach((c) => {
+      if (String(c.user_id) === uid) {
+        const s = Number(c.section ?? c.article_ord ?? 0);
+        if (s === 1 || s === 2 || s === 3) by[s] += 1;
+      }
+    });
+    return by;
+  }, []);
 
-  // 댓글 변동 시 보상 갱신
+  const loadAllCounts = useCallback(async () => {
+    if (!id || !userId) return;
+    try {
+      const [s1, s2, s3] = await Promise.all([
+        api.get("/comments", { params: { post_id: id, section: 1, sort: "new", page: 1, limit: 200 } }).then(r => r.data),
+        api.get("/comments", { params: { post_id: id, section: 2, sort: "new", page: 1, limit: 200 } }).then(r => r.data),
+        api.get("/comments", { params: { post_id: id, section: 3, sort: "new", page: 1, limit: 200 } }).then(r => r.data),
+      ]);
+      const c1 = computeCountsFor(s1, userId);
+      const c2 = computeCountsFor(s2, userId);
+      const c3 = computeCountsFor(s3, userId);
+      const by = {
+        1: (c1[1] || 0) + (c2[1] || 0) + (c3[1] || 0),
+        2: (c1[2] || 0) + (c2[2] || 0) + (c3[2] || 0),
+        3: (c1[3] || 0) + (c2[3] || 0) + (c3[3] || 0),
+      };
+      setCounts(by);
+
+      const perOK =
+        by[1] >= required.perSection &&
+        by[2] >= required.perSection &&
+        by[3] >= required.perSection;
+      const totalOK = by[1] + by[2] + by[3] >= required.total;
+      const eligible = perOK && totalOK;
+
+      const key = `reward_claimed:${id}:${userId}`;
+      const claimed = localStorage.getItem(key) === "1";
+      const stage = claimed ? "claimed" : eligible ? "eligible" : "not_eligible";
+      setRewardStage(stage);
+
+      if (!claimed && eligible) setRewardModalOpen(true);
+    } catch (e) {
+      console.warn("[PostDetailPage Reward] loadAllCounts fail:", e?.message || e);
+    }
+  }, [id, userId, required, computeCountsFor]);
+
+  useEffect(() => {
+    loadAllCounts();
+  }, [loadAllCounts, currentSection]);
+
+
+  // 댓글 변동 시 보상 갱신 (Comments에서 콜백)
   const handleCommentsChanged = useCallback(async () => {
-    await reward.loadStatus();
-    if (reward.openOnceIfEligible()) setRewardModalOpen(true);
-  }, [reward]);
+    await loadAllCounts();
+  }, [loadAllCounts]);
 
   if (loading) return <p style={{ padding: 16 }}>로딩 중…</p>;
   if (error && !verified) return <p style={{ padding: 16, color: "#DC2626" }}>{error}</p>;
@@ -114,16 +170,12 @@ export default function PostDetailPage() {
         onChange={setCurrentSection}
       />
 
-      {/* 02. 보상 헤더 (페이지 최상단에 위치) */}
+      {/* 02. 보상 헤더 */}
       <section className="reward-header" style={{ marginTop: 12 }}>
         <RewardProgress
-          counts={reward.counts}
-          capBySection={reward.capBySection}
-          overflowBySection={reward.overflowBySection}
-          required={reward.required}
-          stage={reward.stage}
-          progress={reward.progress}
-          filled={reward.filled}
+          counts={counts}
+          required={required}
+          stage={rewardStage}
           onOpenModal={() => setRewardModalOpen(true)}
         />
       </section>
@@ -150,21 +202,21 @@ export default function PostDetailPage() {
         <Comments
           postId={post.id}
           section={currentSection}
-          onAfterChange={handleCommentsChanged} 
+          onAfterChange={handleCommentsChanged}
         />
       </div>
 
       {/* 보상 팝업 */}
       <RewardModal
         open={rewardModalOpen}
-        onClose={() => setRewardModalOpen(false)}
-        stage={reward.stage}
-        counts={reward.counts}
-        required={reward.required}
-        claiming={reward.claiming}
-        onClaim={async () => { await reward.claim(); }}
-        openchatUrl={reward.openchatUrl}
-        openchatPw={reward.openchatPw}
+        onClose={() => {
+          if (userId && id) localStorage.setItem(`reward_claimed:${id}:${userId}`, "1");
+          setRewardStage("claimed");
+          setRewardModalOpen(false);
+        }}
+        stage={rewardStage}
+        counts={counts}
+        required={required}
       />
     </div>
   );
