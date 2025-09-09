@@ -15,14 +15,6 @@ import PopupModal from "./PopupModal";
  * - editLogit?: number
  */
 
-console.log("[useAsIs payload PREVIEW]", {
-  text_original: originalText,
-  text_generated_polite: suggestedText,
-  text_user_edit: (lastEvaluatedEditTextRef.current || "").trim(),
-  edit_logit: lastEditLogitRef.current,
-  threshold_applied: Number(threshold ?? 0),
-  final_source: "polite",
-});
 
 export default function RejectEditModal({
   open,

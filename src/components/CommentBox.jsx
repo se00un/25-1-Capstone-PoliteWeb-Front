@@ -11,7 +11,7 @@ import {
 import BanModal from "./BanModal";
 import PoliteModal from "./PoliteModal";
 import RejectEditModal from "./RejectEditModal";
-import ProcessingModal from "./ProcessingModal"; 
+import ProcessingModal from "./ProcessingModal";
 
 const stripLeadingMention = (s = "") =>
   s.replace(/^\s*@[^\s@]+[\s\u00A0]+/, "");
@@ -21,8 +21,8 @@ export default function CommentBox({
   postId,
   section,
   onAfterSuccess,
-  replyTo = null,              
-  prefill = "",                
+  replyTo = null,
+  prefill = "",
   placeholder = "댓글을 입력하세요…",
 }) {
   const { group, threshold } = useExperiment({ postId, section });
@@ -86,7 +86,7 @@ export default function CommentBox({
       setProcOpen(false);
       showToast(msg, "success");
       if (onAfterSuccess) {
-        await onAfterSuccess(res); 
+        await onAfterSuccess(res);
       }
       flowUuidRef.current =
         crypto?.randomUUID?.() || `tmp_${Math.random().toString(36).slice(2)}`;
@@ -103,14 +103,14 @@ export default function CommentBox({
     if (secondAttempt) {
       try {
         setSubmitting(true);
-        setProcOpen(true);  
-        setProcMsg("표현 분석 중…"); 
+        setProcOpen(true);
+        setProcMsg("표현 분석 중…");
 
         // 멘션 제거된 텍스트로 판정
         const predEdit = await predictBert({ postId, text: modelInput, threshold });
 
         if (predEdit?.over_threshold) {
-          setProcMsg("⚠️ 공격적 표현이 감지되었습니다."); 
+          setProcMsg("⚠️ 공격적 표현이 감지되었습니다.");
         } else {
           setProcMsg("댓글 표현 사이트 정책 위반 없음.");
         }
@@ -119,8 +119,21 @@ export default function CommentBox({
         if (predEdit.over_threshold) {
           lastEditLogitRef.current = predEdit?.probability ?? null;
           lastEvaluatedEditTextRef.current = modelInput;
-          setProcOpen(false); 
+
+          console.log("[EDIT attempt blocked][open reject modal]", {
+            user_id: userId,
+            post_id: postId,
+            section,
+            user_edit_text: modelInput,
+            edit_logit: predEdit?.probability ?? null,
+            threshold_applied: Number(threshold ?? 0),
+            suggestedText,
+            originalText,
+          });
+
+          setProcOpen(false);
           setRejectOpen(true);
+
           logInterventionEvent({
             user_id: userId,
             post_id: postId,
@@ -131,7 +144,7 @@ export default function CommentBox({
             edit_logit: predEdit?.probability ?? null,
             threshold_applied: Number(threshold ?? 0),
             generated_polite_text: suggestedText || undefined,
-            user_edit_text: modelInput, 
+            user_edit_text: modelInput,
             decision_rule_applied: "forced_accept_one_edit",
             final_choice_hint: "unknown",
             latency_ms: Math.round(performance.now() - t0Ref.current),
@@ -139,14 +152,28 @@ export default function CommentBox({
           return;
         }
 
-        // 수정본 통과 → 저장 
+        // 수정본 통과 → 저장 직전 콘솔
+        console.log("[SAVE before submit][2nd-pass user_edit]", {
+          text_original: originalText,
+          text_generated_polite: suggestedText || undefined,
+          text_user_edit: modelInput,
+          edit_logit: predEdit?.probability ?? undefined,
+          threshold_applied: Number(threshold ?? 0),
+          final_source: "user_edit",
+          user_id: userId,
+          post_id: postId,
+          section,
+          parent_comment_id: replyTo || undefined,
+        });
+
+        // 수정본 통과 → 저장
         const res = await saveComment({
           user_id: userId,
           post_id: postId,
           section,
-          text_original: originalText,                
+          text_original: originalText,
           text_generated_polite: suggestedText || undefined,
-          text_user_edit: modelInput,                
+          text_user_edit: modelInput,
           parent_comment_id: replyTo || undefined,
         });
         if (!res?.saved) {
@@ -165,7 +192,7 @@ export default function CommentBox({
           edit_logit: predEdit?.probability ?? null,
           threshold_applied: Number(threshold ?? 0),
           generated_polite_text: suggestedText || undefined,
-          user_edit_text: modelInput,               
+          user_edit_text: modelInput,
           decision_rule_applied: "forced_accept_one_edit",
           final_choice_hint: "user_edit",
           latency_ms: Math.round(performance.now() - t0Ref.current),
@@ -185,28 +212,40 @@ export default function CommentBox({
     try {
       setSubmitting(true);
       setProcOpen(true);
-      setProcMsg("표현 분석 중…"); 
+      setProcMsg("표현 분석 중…");
 
       // 먼저 BERT로 원문 logit 확보
       const pred = await predictBert({ postId, text: modelInput, threshold });
       setOriginalLogit(pred?.probability ?? null);
 
       if (pred?.over_threshold) {
-        setProcMsg("⚠️ 공격적 표현이 감지되었습니다."); 
+        setProcMsg("⚠️ 공격적 표현이 감지되었습니다.");
       } else {
         setProcMsg("댓글 표현 사이트 정책 위반 없음.");
       }
 
-      // 정책/제안 확인 
+      // 정책/제안 확인
       const s = await suggestComment({ postId, section, text: modelInput });
 
-      // θ 미만 → 원문 저장 
+      // θ 미만 → 원문 저장
       if (s.over_threshold === false) {
+        // 저장 직전 콘솔
+        console.log("[SAVE before submit][1st-pass original]", {
+          text_original: modelInput,
+          final_source: "original",
+          original_logit: pred?.probability ?? undefined,
+          threshold_applied: Number(pred?.threshold_applied ?? threshold ?? 0),
+          user_id: userId,
+          post_id: postId,
+          section,
+          parent_comment_id: replyTo || undefined,
+        });
+
         const res = await saveComment({
           user_id: userId,
           post_id: postId,
           section,
-          text_original: modelInput,                  
+          text_original: modelInput,
           parent_comment_id: replyTo || undefined,
         });
         if (!res?.saved) {
@@ -252,11 +291,20 @@ export default function CommentBox({
 
       // B: 순화 제안
       if (s.policy_mode === "polite_one_edit" && s.polite_text) {
-        setOriginalText(modelInput);       
+        setOriginalText(modelInput);
         setSuggestedText(s.polite_text);
         setSecondAttempt(false);
         setProcOpen(false);
         setPoliteOpen(true);
+
+        console.log("[SUGGEST opened][1st→2nd flow]", {
+          originalText: modelInput,
+          suggestedText: s.polite_text,
+          threshold_applied: Number(pred?.threshold_applied ?? threshold ?? 0),
+          original_logit: pred?.probability ?? null,
+          policy_mode: s.policy_mode,
+        });
+
         logInterventionEvent({
           user_id: userId,
           post_id: postId,
@@ -304,13 +352,28 @@ export default function CommentBox({
       setPoliteOpen(false);
       setRejectOpen(false);
 
+      // ✅ 거절 후 순화문으로 등록 직전 콘솔 (실패한 수정시도 기록 보존)
+      console.log("[SAVE before submit][fallback to polite]", {
+        text_original: originalText,
+        text_generated_polite: suggestedText,
+        text_user_edit: (lastEvaluatedEditTextRef.current || "").trim() || undefined,
+        edit_logit: lastEditLogitRef.current ?? undefined,
+        threshold_applied: Number(threshold ?? 0),
+        final_source: "polite",
+        user_id: userId,
+        post_id: postId,
+        section,
+        parent_comment_id: replyTo || undefined,
+      });
+
       const res = await saveComment({
         user_id: userId,
         post_id: postId,
         section,
-        text_original: originalText,      // 이미 멘션 제거본
+        text_original: originalText,
         text_generated_polite: suggestedText,
         text_final: suggestedText,
+        text_user_edit: (lastEvaluatedEditTextRef.current || "").trim() || undefined,
         parent_comment_id: replyTo || undefined,
       });
       if (!res?.saved) {
@@ -328,6 +391,8 @@ export default function CommentBox({
         original_logit: originalLogit ?? 0.0,
         threshold_applied: Number(threshold ?? 0),
         generated_polite_text: suggestedText,
+        user_edit_text: (lastEvaluatedEditTextRef.current || "").trim() || undefined,
+        edit_logit: lastEditLogitRef.current ?? undefined,
         decision_rule_applied: "forced_accept_one_edit",
         final_choice_hint: "polite",
         latency_ms: Math.round(performance.now() - t0Ref.current),
@@ -357,7 +422,7 @@ export default function CommentBox({
   /** 순화문을 입력창으로 가져와서 수정 시작 */
   const handleEditThenSubmit = useCallback(() => {
     if (!suggestedText) return;
-    setText(suggestedText);    
+    setText(suggestedText);
     setSecondAttempt(true);
     setPoliteOpen(false);
     inputRef.current?.focus();
@@ -449,4 +514,3 @@ export default function CommentBox({
     </div>
   );
 }
-
