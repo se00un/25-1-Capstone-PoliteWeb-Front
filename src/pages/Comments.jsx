@@ -202,16 +202,6 @@ export default function Comments({ postId, section, onAfterChange }) {
       <section className="comments-shell">
         <div className="comments-header">섹션 {section} 댓글</div>
 
-        {/* 진행도/보상 영역 */}
-        <div style={{ margin: "8px 0" }}>
-          <RewardProgress
-            counts={counts}
-            required={required}
-            stage={rewardStage}
-            onOpenModal={openReward}
-          />
-        </div>
-
         <div className="comments-list">
           {loading && <div className="comments-empty">불러오는 중…</div>}
 
