@@ -1,5 +1,4 @@
 // src/pages/PostDetailPage.jsx
-
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import api from "../lib/api";
@@ -30,6 +29,7 @@ export default function PostDetailPage() {
     }
     setUserId(stored);
   }, []);
+  const uidReady = !!userId;
 
   const load = useCallback(async () => {
     if (!state?.password) {
@@ -97,20 +97,27 @@ export default function PostDetailPage() {
   const [counts, setCounts] = useState({ 1: 0, 2: 0, 3: 0 });
   const required = useMemo(() => ({ total: 9, perSection: 3 }), []);
 
+  const normalize = (x) => String(x ?? "").trim();
+
   const computeCountsFor = useCallback((list, me) => {
     const by = { 1: 0, 2: 0, 3: 0 };
-    const uid = String(me || "");
+    const uid = normalize(me);
+    if (!uid) return by; // userId 없으면 집계 금지
+
     (Array.isArray(list) ? list : []).forEach((c) => {
-      if (String(c.user_id) === uid) {
-        const s = Number(c.section ?? c.article_ord ?? 0);
-        if (s === 1 || s === 2 || s === 3) by[s] += 1;
-      }
+      const cid = normalize(c.user_id);
+      if (!cid) return;      // 유령 레거시 무시
+      if (cid !== uid) return;
+
+      const sRaw = c.section ?? c.article_ord ?? 0;
+      const s = Number(sRaw);
+      if (s === 1 || s === 2 || s === 3) by[s] += 1;
     });
     return by;
   }, []);
 
   const loadAllCounts = useCallback(async () => {
-    if (!id || !userId) return;
+    if (!id || !uidReady) return;
     try {
       const [s1, s2, s3] = await Promise.all([
         api.get("/comments", { params: { post_id: id, section: 1, sort: "new", page: 1, limit: 200 } }).then(r => r.data),
@@ -120,6 +127,7 @@ export default function PostDetailPage() {
       const c1 = computeCountsFor(s1, userId);
       const c2 = computeCountsFor(s2, userId);
       const c3 = computeCountsFor(s3, userId);
+
       const by = {
         1: (c1[1] || 0) + (c2[1] || 0) + (c3[1] || 0),
         2: (c1[2] || 0) + (c2[2] || 0) + (c3[2] || 0),
@@ -136,14 +144,19 @@ export default function PostDetailPage() {
 
       const key = `reward_claimed:${id}:${userId}`;
       const claimed = localStorage.getItem(key) === "1";
-      const stage = claimed ? "claimed" : eligible ? "eligible" : "not_eligible";
+
+      if (claimed && !eligible) {
+        localStorage.removeItem(key);
+      }
+      const finalClaimed = eligible && localStorage.getItem(key) === "1";
+      const stage = finalClaimed ? "claimed" : eligible ? "eligible" : "not_eligible";
       setRewardStage(stage);
 
-      if (!claimed && eligible) setRewardModalOpen(true);
+      if (!finalClaimed && eligible) setRewardModalOpen(true);
     } catch (e) {
       console.warn("[PostDetailPage Reward] loadAllCounts fail:", e?.message || e);
     }
-  }, [id, userId, required, computeCountsFor]);
+  }, [id, uidReady, userId, required, computeCountsFor]);
 
   useEffect(() => {
     loadAllCounts();
@@ -153,12 +166,12 @@ export default function PostDetailPage() {
     await loadAllCounts();
   }, [loadAllCounts]);
 
-  // 닫기
+  // 닫기: 단순 닫기
   const handleRewardClose = useCallback(() => {
     setRewardModalOpen(false);
   }, []);
 
-  // 수령
+  // 수령: 실제 수령 처리
   const handleRewardClaim = useCallback(() => {
     if (userId && id) {
       localStorage.setItem(`reward_claimed:${id}:${userId}`, "1");
@@ -183,14 +196,16 @@ export default function PostDetailPage() {
       />
 
       {/* 02. 보상 헤더 */}
-      <section className="reward-header" style={{ marginTop: 12 }}>
-        <RewardProgress
-          counts={counts}
-          required={required}
-          stage={rewardStage}
-          onOpenModal={() => setRewardModalOpen(true)}
-        />
-      </section>
+      {uidReady && (
+        <section className="reward-header" style={{ marginTop: 12 }}>
+          <RewardProgress
+            counts={counts}
+            required={required}
+            stage={rewardStage}
+            onOpenModal={() => setRewardModalOpen(true)}
+          />
+        </section>
+      )}
 
       {/* 03. 게시글 본문 */}
       <article
@@ -219,14 +234,16 @@ export default function PostDetailPage() {
       </div>
 
       {/* 05. 보상 팝업 */}
-      <RewardModal
-        open={rewardModalOpen}
-        onClose={handleRewardClose}
-        onClaim={handleRewardClaim}
-        stage={rewardStage}
-        counts={counts}
-        required={required}
-      />
+      {uidReady && (
+        <RewardModal
+          open={rewardModalOpen}
+          onClose={handleRewardClose}
+          onClaim={handleRewardClaim}
+          stage={rewardStage}
+          counts={counts}
+          required={required}
+        />
+      )}
     </div>
   );
 }

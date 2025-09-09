@@ -36,6 +36,8 @@ export default function Comments({ postId, section, onAfterChange }) {
     setUserId(stored);
   }, []);
 
+  const uidReady = !!userId;
+
   // load comments (현재 섹션)
   const load = useCallback(async () => {
     if (!postId || section == null) return;
@@ -131,30 +133,37 @@ export default function Comments({ postId, section, onAfterChange }) {
     setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }, []);
 
-  // Reward: 섹션별/총합 카운트 계산
+  // Reward
+  const normalize = (x) => String(x ?? "").trim();
+
   const computeCountsFor = useCallback((list, me) => {
     const by = { 1: 0, 2: 0, 3: 0 };
-    const uid = String(me || "");
-    list.forEach((c) => {
-      if (String(c.user_id) === uid) {
-        const s = Number(c.section ?? c.article_ord ?? 0);
-        if (s === 1 || s === 2 || s === 3) by[s] += 1;
-      }
+    const uid = normalize(me);
+    if (!uid) return by; 
+
+    (Array.isArray(list) ? list : []).forEach((c) => {
+      const cid = normalize(c.user_id);
+      if (!cid) return; 
+      if (cid !== uid) return;
+
+      const sRaw = c.section ?? c.article_ord ?? 0;
+      const s = Number(sRaw);
+      if (s === 1 || s === 2 || s === 3) by[s] += 1;
     });
     return by;
   }, []);
 
   const loadAllCounts = useCallback(async () => {
-    if (!postId || !userId) return;
+    if (!postId || !uidReady) return;
     try {
       const [s1, s2, s3] = await Promise.all([
         apiFetchComments({ postId, section: 1, sort: "new", page: 1, limit: 200 }),
         apiFetchComments({ postId, section: 2, sort: "new", page: 1, limit: 200 }),
         apiFetchComments({ postId, section: 3, sort: "new", page: 1, limit: 200 }),
       ]);
-      const c1 = computeCountsFor(Array.isArray(s1) ? s1 : [], userId);
-      const c2 = computeCountsFor(Array.isArray(s2) ? s2 : [], userId);
-      const c3 = computeCountsFor(Array.isArray(s3) ? s3 : [], userId);
+      const c1 = computeCountsFor(s1, userId);
+      const c2 = computeCountsFor(s2, userId);
+      const c3 = computeCountsFor(s3, userId);
 
       const by = {
         1: (c1[1] || 0) + (c2[1] || 0) + (c3[1] || 0),
@@ -172,25 +181,31 @@ export default function Comments({ postId, section, onAfterChange }) {
 
       const key = `reward_claimed:${postId}:${userId}`;
       const claimed = localStorage.getItem(key) === "1";
-      const stage = claimed ? "claimed" : eligible ? "eligible" : "not_eligible";
+
+      // 불일치 복구: claimed인데 eligible이 아니면 플래그 제거
+      if (claimed && !eligible) {
+        localStorage.removeItem(key);
+      }
+      const finalClaimed = eligible && localStorage.getItem(key) === "1";
+      const stage = finalClaimed ? "claimed" : eligible ? "eligible" : "not_eligible";
       setRewardStage(stage);
 
-      if (!claimed && eligible) setRewardOpen(true);
+      if (!finalClaimed && eligible) setRewardOpen(true);
     } catch (e) {
       console.warn("[Reward] count load fail:", e?.message || e);
     }
-  }, [postId, userId, required, computeCountsFor]);
+  }, [postId, uidReady, userId, required, computeCountsFor]);
 
   useEffect(() => {
     loadAllCounts();
   }, [loadAllCounts]);
 
-  // 닫기
+  // 닫기: 단순 닫기
   const closeReward = useCallback(() => {
     setRewardOpen(false);
   }, []);
 
-  // 수령
+  // 수령: 실제 수령 처리 (eligible일 때만 의미)
   const claimReward = useCallback(() => {
     if (userId && postId) {
       localStorage.setItem(`reward_claimed:${postId}:${userId}`, "1");
@@ -238,7 +253,7 @@ export default function Comments({ postId, section, onAfterChange }) {
             onAfterSuccess={async () => {
               await load();
               onAfterChange?.();
-              await loadAllCounts();
+              await loadAllCounts(); // 새 댓글 후 카운트 갱신
             }}
             replyTo={replyTarget?.id || null}
             prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
@@ -252,15 +267,17 @@ export default function Comments({ postId, section, onAfterChange }) {
           )}
         </div>
 
-        {/* 보상 안내 모달 */}
-        <RewardModal
-          open={rewardOpen}
-          onClose={closeReward}
-          onClaim={claimReward}
-          stage={rewardStage}
-          counts={counts}
-          required={required}
-        />
+        {/* 보상 안내 모달 (userId 준비된 뒤에만 렌더) */}
+        {uidReady && (
+          <RewardModal
+            open={rewardOpen}
+            onClose={closeReward}
+            onClaim={claimReward}
+            stage={rewardStage}
+            counts={counts}
+            required={required}
+          />
+        )}
       </section>
     </div>
   );
