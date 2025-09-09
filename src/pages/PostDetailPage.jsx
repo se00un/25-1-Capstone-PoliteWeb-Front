@@ -13,17 +13,13 @@ import RewardModal from "../components/RewardModal";
 export default function PostDetailPage() {
   const { id } = useParams();
   const { state } = useLocation();
+
   const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
   const [post, setPost] = useState(null);
   const [subPosts, setSubPosts] = useState([]);
   const [currentSection, setCurrentSection] = useState(1);
   const [error, setError] = useState("");
-
-  const [rewardModalOpen, setRewardModalOpen] = useState(false);
-  const [rewardStage, setRewardStage] = useState("not_eligible"); // 'not_eligible' | 'eligible' | 'claimed'
-  const [counts, setCounts] = useState({ 1: 0, 2: 0, 3: 0 });
-  const required = useMemo(() => ({ total: 9, perSection: 3 }), []);
 
   const [userId, setUserId] = useState("");
   useEffect(() => {
@@ -73,7 +69,6 @@ export default function PostDetailPage() {
     load();
   }, [load]);
 
-  // 섹션 목록
   const sectionNumbers = useMemo(() => {
     if (subPosts.length) {
       return subPosts
@@ -96,7 +91,12 @@ export default function PostDetailPage() {
     }
   }, [sectionNumbers, currentSection]);
 
-  // Reward 계산
+  // ===== Reward (헤더/모달 공용) =====
+  const [rewardModalOpen, setRewardModalOpen] = useState(false);
+  const [rewardStage, setRewardStage] = useState("not_eligible"); // 'not_eligible' | 'eligible' | 'claimed'
+  const [counts, setCounts] = useState({ 1: 0, 2: 0, 3: 0 });
+  const required = useMemo(() => ({ total: 9, perSection: 3 }), []);
+
   const computeCountsFor = useCallback((list, me) => {
     const by = { 1: 0, 2: 0, 3: 0 };
     const uid = String(me || "");
@@ -149,11 +149,23 @@ export default function PostDetailPage() {
     loadAllCounts();
   }, [loadAllCounts, currentSection]);
 
-
-  // 댓글 변동 시 보상 갱신 (Comments에서 콜백)
   const handleCommentsChanged = useCallback(async () => {
     await loadAllCounts();
   }, [loadAllCounts]);
+
+  // 닫기
+  const handleRewardClose = useCallback(() => {
+    setRewardModalOpen(false);
+  }, []);
+
+  // 수령
+  const handleRewardClaim = useCallback(() => {
+    if (userId && id) {
+      localStorage.setItem(`reward_claimed:${id}:${userId}`, "1");
+    }
+    setRewardStage("claimed");
+    setRewardModalOpen(false);
+  }, [id, userId]);
 
   if (loading) return <p style={{ padding: 16 }}>로딩 중…</p>;
   if (error && !verified) return <p style={{ padding: 16, color: "#DC2626" }}>{error}</p>;
@@ -206,14 +218,11 @@ export default function PostDetailPage() {
         />
       </div>
 
-      {/* 보상 팝업 */}
+      {/* 05. 보상 팝업 */}
       <RewardModal
         open={rewardModalOpen}
-        onClose={() => {
-          if (userId && id) localStorage.setItem(`reward_claimed:${id}:${userId}`, "1");
-          setRewardStage("claimed");
-          setRewardModalOpen(false);
-        }}
+        onClose={handleRewardClose}
+        onClaim={handleRewardClaim}
         stage={rewardStage}
         counts={counts}
         required={required}

@@ -4,7 +4,8 @@ import React from "react";
 export default function RewardModal({
   open,
   onClose,
-  stage = "not_eligible", // 'not_eligible' | 'eligible' | 'claimed'
+  onClaim,                   
+  stage = "not_eligible",    
   counts = { 1: 0, 2: 0, 3: 0 },
   required = { total: 9, perSection: 3 },
 }) {
@@ -49,6 +50,26 @@ export default function RewardModal({
             <div style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>
               오픈채팅방에 '닉네임'으로 입장해주세요.
             </div>
+
+            {isEligible && !isClaimed && (
+              <div style={{ marginTop: 10 }}>
+                <button
+                  onClick={onClaim}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #2563EB",
+                    background: "#2563EB",
+                    color: "#fff",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  보상 수령 완료로 표시
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -65,58 +86,15 @@ function InfoCard({ label, value }) {
   );
 }
 
-const backdrop = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,.25)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 50,
-};
-
-const modal = {
-  width: 520,
-  maxWidth: "92vw",
-  background: "#FFFFFF",
-  borderRadius: 12,
-  border: "1px solid #E5E7EB",
-  boxShadow: "0 10px 30px rgba(0,0,0,.15)",
-  padding: 16,
-};
-
-const header = { display: "flex", alignItems: "center", gap: 8 };
-const title = { fontWeight: 800, color: "#111827", fontSize: 16 };
-const btnClose = {
-  marginLeft: "auto",
-  width: 30, height: 30,
-  borderRadius: 8,
-  border: "1px solid #E5E7EB",
-  background: "#F9FAFB",
-  cursor: "pointer",
-};
-
-const section = { marginTop: 12 };
-
-const grantBox = {
-  marginTop: 14,
-  border: "1px solid #E5E7EB",
-  borderRadius: 10,
-  padding: 12,
-  background: "#F9FAFB",
-};
-
-const kv = { display: "flex", alignItems: "center", gap: 8, marginTop: 6 };
-const k = { width: 110, color: "#6B7280", fontSize: 13 };
-const v = { fontWeight: 800, color: "#111827" };
-const vLink = { color: "#2563EB", textDecoration: "underline", wordBreak: "break-all" };
-
-const infoCard = {
-  border: "1px solid #E5E7EB",
-  borderRadius: 10,
-  padding: 10,
-  background: "#FFFFFF",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
+const backdrop = { position:"fixed", inset:0, background:"rgba(0,0,0,.25)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50 };
+const modal = { width:520, maxWidth:"92vw", background:"#FFFFFF", borderRadius:12, border:"1px solid #E5E7EB", boxShadow:"0 10px 30px rgba(0,0,0,.15)", padding:16 };
+const header = { display:"flex", alignItems:"center", gap:8 };
+const title = { fontWeight:800, color:"#111827", fontSize:16 };
+const btnClose = { marginLeft:"auto", width:30, height:30, borderRadius:8, border:"1px solid #E5E7EB", background:"#F9FAFB", cursor:"pointer" };
+const section = { marginTop:12 };
+const grantBox = { marginTop:14, border:"1px solid #E5E7EB", borderRadius:10, padding:12, background:"#F9FAFB" };
+const kv = { display:"flex", alignItems:"center", gap:8, marginTop:6 };
+const k = { width:110, color:"#6B7280", fontSize:13 };
+const v = { fontWeight:800, color:"#111827" };
+const vLink = { color:"#2563EB", textDecoration:"underline", wordBreak:"break-all" };
+const infoCard = { border:"1px solid #E5E7EB", borderRadius:10, padding:10, background:"#FFFFFF", display:"flex", alignItems:"center", justifyContent:"space-between" };

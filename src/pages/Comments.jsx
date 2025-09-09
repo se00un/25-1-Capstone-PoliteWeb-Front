@@ -1,5 +1,4 @@
-// src/pages/Comments.jsx  
-
+// src/pages/Comments.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CommentItem from "../components/CommentItem";
 import CommentBox from "../components/CommentBox";
@@ -132,8 +131,7 @@ export default function Comments({ postId, section, onAfterChange }) {
     setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }, []);
 
-  
-  // Reward: 섹션별/총합 카운트 계산(클라이언트) + 1회 자동 팝업
+  // Reward: 섹션별/총합 카운트 계산
   const computeCountsFor = useCallback((list, me) => {
     const by = { 1: 0, 2: 0, 3: 0 };
     const uid = String(me || "");
@@ -158,7 +156,6 @@ export default function Comments({ postId, section, onAfterChange }) {
       const c2 = computeCountsFor(Array.isArray(s2) ? s2 : [], userId);
       const c3 = computeCountsFor(Array.isArray(s3) ? s3 : [], userId);
 
-      // 안전 합산(혹시라도 섹션 키 혼재 대비)
       const by = {
         1: (c1[1] || 0) + (c2[1] || 0) + (c3[1] || 0),
         2: (c1[2] || 0) + (c2[2] || 0) + (c3[2] || 0),
@@ -188,8 +185,13 @@ export default function Comments({ postId, section, onAfterChange }) {
     loadAllCounts();
   }, [loadAllCounts]);
 
-  const openReward = useCallback(() => setRewardOpen(true), []);
+  // 닫기
   const closeReward = useCallback(() => {
+    setRewardOpen(false);
+  }, []);
+
+  // 수령
+  const claimReward = useCallback(() => {
     if (userId && postId) {
       localStorage.setItem(`reward_claimed:${postId}:${userId}`, "1");
     }
@@ -236,7 +238,7 @@ export default function Comments({ postId, section, onAfterChange }) {
             onAfterSuccess={async () => {
               await load();
               onAfterChange?.();
-              await loadAllCounts(); // 새 댓글 후 카운트 갱신
+              await loadAllCounts();
             }}
             replyTo={replyTarget?.id || null}
             prefill={replyTarget ? `@${replyTarget.nickname} ` : ""}
@@ -250,10 +252,11 @@ export default function Comments({ postId, section, onAfterChange }) {
           )}
         </div>
 
-        {/* 보상 안내 모달 (Env 기반) */}
+        {/* 보상 안내 모달 */}
         <RewardModal
           open={rewardOpen}
           onClose={closeReward}
+          onClaim={claimReward}
           stage={rewardStage}
           counts={counts}
           required={required}
