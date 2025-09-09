@@ -47,7 +47,7 @@ export default function RewardModal({
             </div>
             <div style={kv}><span style={k}>입장 비밀번호</span><span style={v}>{openchatPw || "-"}</span></div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>
-              안내용 정보입니다. 
+              오픈채팅방에 '닉네임'으로 입장해주세요.
             </div>
           </div>
         )}
