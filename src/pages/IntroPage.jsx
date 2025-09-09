@@ -46,7 +46,7 @@ const IntroPage = () => {
 
           <p style={{ lineHeight: 1.7, marginTop: 12, color: "var(--fg)" }}>
             이 웹사이트는 <strong>온라인 커뮤니케이션 환경 개선</strong>을 위한 실험용 시스템입니다.
-            댓글 작성 과정에서 AI가 개입해 <strong>순화 제안</strong> 또는 <strong>차단</strong>을 수행할 수 있습니다.
+            댓글 작성 과정에서 AI가 개입하여 <strong>시스템 정책에 따라 댓글 작성이 이루어집니다.</strong>
           </p>
 
           <h2 style={{ fontSize: "1.1rem", marginTop: 24, color: "var(--fg)" }}>⚠️ 이용 안내</h2>
@@ -54,15 +54,15 @@ const IntroPage = () => {
             <li>
               <strong>공격적/모욕적 표현</strong>을 포함한 댓글 작성이 실험 목적으로 허용됩니다.
             </li>
-            <li>원문이 시스템 기준을 <strong>통과하면 그대로 등록</strong>됩니다.</li>
+            <li>반드시 본인의 닉네임을 기억해주세요! (재입장 및 보상 확인에 필요합니다)</li>
             <li>
-              기준을 <strong>초과</strong>하면 <strong>댓글은 웹사이트 정책</strong>에 따라 작동됩니다.
+              댓글이 시스템 기준을 <strong>초과</strong>할 경우, <strong>웹사이트 정책에 따라 처리</strong>됩니다.
             </li>
             <li>
               처리 중에는 <strong>페이지 이동/새로고침을 하지 말아주세요.</strong> (최대 1분이 소요될 수 있습니다)
             </li>
             <li>
-              댓글은 <strong>등록 후 수정 불가</strong>이며, 본인이 <strong>삭제</strong>할 수 있습니다.
+              댓글은 <strong>등록 후 수정이 불가능</strong>합니다.
             </li>
           </ul>
 
@@ -83,7 +83,7 @@ const IntroPage = () => {
             <li>로그인 후 게시글을 선택합니다.</li>
             <li>비밀번호 입력 후 섹션을 이동하며 댓글을 작성합니다.</li>
             <li>
-              기준 초과 시 정책에 따라 순화문 등록 또는 차단이 이루어질 수 있습니다.
+              기준 초과 시 사이트 정책에 따라 댓글이 등록됩니다.
             </li>
           </ol>
 
