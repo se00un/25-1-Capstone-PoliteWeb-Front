@@ -2,7 +2,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { getExperimentMeta } from "../lib/api";
 
-
 export default function useExperiment({ postId, section }) {
   const [group, setGroup] = useState(localStorage.getItem("exp_group") || null); 
   const [threshold, setThreshold] = useState(
@@ -10,6 +9,10 @@ export default function useExperiment({ postId, section }) {
       ? Number(localStorage.getItem("exp_threshold"))
       : null
   );
+  const [policyMode, setPolicyMode] = useState(
+    localStorage.getItem("exp_policy_mode") || null
+  );
+
   const [attemptIndex, setAttemptIndex] = useState(1); 
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [error, setError] = useState(null);
@@ -31,6 +34,11 @@ export default function useExperiment({ postId, section }) {
         localStorage.setItem("exp_group", srvGroup);
         localStorage.setItem("exp_threshold", String(srvThreshold));
       }
+
+      if (meta?.policy_mode) {
+        setPolicyMode(meta.policy_mode);
+        localStorage.setItem("exp_policy_mode", meta.policy_mode);
+      }
     } catch (e) {
       console.warn("[useExperiment] refreshMeta error:", e?.message || e);
       setError(e);
@@ -48,11 +56,13 @@ export default function useExperiment({ postId, section }) {
     setAttemptIndex(1);
     setLastResult(null);
     setError(null);
+    setPolicyMode(null);
   }, []);
 
   return {
     group,
     threshold,
+    policyMode,   
     attemptIndex,
     loadingMeta,
     error,

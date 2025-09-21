@@ -25,7 +25,8 @@ export default function CommentBox({
   prefill = "",
   placeholder = "댓글을 입력하세요…",
 }) {
-  const { group, threshold } = useExperiment({ postId, section });
+  // policyMode 추가로 가져오기
+  const { group, threshold, policyMode } = useExperiment({ postId, section });
 
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -100,82 +101,42 @@ export default function CommentBox({
     [onAfterSuccess, showToast]
   );
 
-  // 순화문으로 저장 (수정 시도 O면 text_user_edit/ edit_logit 포함)
-  const saveAsPolite = useCallback(
-    async (fromAuto = false) => {
-      if (!suggestedText) {
-        showToast("순화문이 없어 저장할 수 없습니다.", "error");
-        return null;
-      }
-
-      setProcOpen(true);
-      setProcMsg(fromAuto ? "임계 초과 — 순화문으로 자동 등록 중…" : "제출 처리중…");
-
-      const userEditForPayload = editAttemptedRef.current
-        ? (lastEvaluatedEditTextRef.current || "").trim() || undefined
-        : undefined;
-      const editLogitForPayload = editAttemptedRef.current
-        ? lastEditLogitRef.current ?? undefined
-        : undefined;
-
-    
-      const res = await saveComment({
-        user_id: userId,
-        post_id: postId,
-        section,
-        text_original: originalText,
-        text_generated_polite: suggestedText,
-        text_user_edit: userEditForPayload,
-        threshold_applied: Number(threshold ?? 0),
-        parent_comment_id: replyTo || undefined,
-      });
-
-      if (!res?.saved) {
-        setProcOpen(false);
-        showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
-        return null;
-      }
-
-      logInterventionEvent({
-        user_id: userId,
-        post_id: postId,
-        article_ord: section,
-        temp_uuid: flowUuidRef.current,
-        attempt_no: 2,
-        original_logit: originalLogit ?? 0.0,
-        edit_logit: editLogitForPayload ?? null,
-        threshold_applied: Number(threshold ?? 0),
-        generated_polite_text: suggestedText,
-        user_edit_text: userEditForPayload,
-        decision_rule_applied: "forced_accept_one_edit",
-        final_choice_hint: "polite",
-        latency_ms: Math.round(performance.now() - t0Ref.current),
-      });
-
-      setProcOpen(false);
-      await afterSuccess(res, fromAuto ? "임계 초과 — 순화문으로 자동 등록되었습니다!" : "순화문으로 등록되었습니다!");
-      return res;
-    },
-    [
-      suggestedText,
-      originalText,
-      userId,
-      postId,
-      section,
-      replyTo,
-      threshold,
-      originalLogit,
-      afterSuccess,
-      showToast,
-    ]
-  );
-
   /** 제출 */
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
     t0Ref.current = performance.now();
 
-    // 2차 시도: 수정본 제출
+    // nofilter 모드: 원문 그대로 저장
+    if (policyMode === "nofilter") {
+      try {
+        setSubmitting(true);
+        setProcOpen(true);
+        setProcMsg("무필터 모드 — 원문 그대로 등록 중…");
+
+        const res = await saveComment({
+          user_id: userId,
+          post_id: postId,
+          section,
+          text_original: modelInput,
+          parent_comment_id: replyTo || undefined,
+        });
+
+        setProcOpen(false);
+        if (!res?.saved) {
+          showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
+          return;
+        }
+        return await afterSuccess(res, "무필터 모드 — 원문 그대로 등록되었습니다!");
+      } catch (e) {
+        setProcOpen(false);
+        showToast(e.message || "제출 중 오류가 발생했습니다.", "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // 2차 시도: 수정본 제출 (기존 로직 그대로)
     if (secondAttempt) {
       try {
         setSubmitting(true);
@@ -183,19 +144,15 @@ export default function CommentBox({
         setProcMsg("표현 분석 중…");
         editAttemptedRef.current = true;
 
-        // 판정
         const predEdit = await predictBert({ postId, text: modelInput, threshold });
 
         if (predEdit?.over_threshold) {
-          // 실패 기록 버퍼 저장
           lastEditLogitRef.current = predEdit?.probability ?? null;
           lastEvaluatedEditTextRef.current = modelInput;
 
-          // 모달 먼저
           setProcOpen(false);
           setRejectOpen(true);
 
-          // 이벤트 로그(거절 안내 지점)
           logInterventionEvent({
             user_id: userId,
             post_id: postId,
@@ -214,7 +171,6 @@ export default function CommentBox({
           return;
         }
 
-        // 통과 → 사용자 수정본으로 저장
         const res = await saveComment({
           user_id: userId,
           post_id: postId,
@@ -259,7 +215,7 @@ export default function CommentBox({
       return;
     }
 
-    // 1차 시도: 원문 제출
+    // 1차 시도: 원문 제출 (block / polite_one_edit 기존 로직)
     try {
       setSubmitting(true);
       setProcOpen(true);
@@ -276,7 +232,6 @@ export default function CommentBox({
 
       const s = await suggestComment({ postId, section, text: modelInput });
 
-      // θ 미만 → 원문 저장
       if (s.over_threshold === false) {
         const res = await saveComment({
           user_id: userId,
@@ -307,7 +262,6 @@ export default function CommentBox({
         return await afterSuccess(res, "등록되었습니다!");
       }
 
-      // A: 차단
       if (s.policy_mode === "block") {
         setProcOpen(false);
         setBanOpen(true);
@@ -327,7 +281,6 @@ export default function CommentBox({
         return;
       }
 
-      // B: 순화 제안 (수정 기회 시작)
       if (s.policy_mode === "polite_one_edit" && s.polite_text) {
         setOriginalText(modelInput);
         setSuggestedText(s.polite_text);
@@ -369,32 +322,9 @@ export default function CommentBox({
     threshold,
     originalLogit,
     afterSuccess,
-    saveAsPolite,
     showToast,
+    policyMode,
   ]);
-
-  /** 순화문 그대로 사용 (수정 없이 바로 순화) */
-  const handleUseAsIs = useCallback(async () => {
-    return await saveAsPolite(false);
-  }, [saveAsPolite]);
-
-  /** 제안문을 입력창으로 가져와서 수정 (1회) */
-  const handleEditThenSubmit = useCallback(() => {
-    if (!suggestedText) return;
-    setText(suggestedText);
-    setSecondAttempt(true);
-    setPoliteOpen(false);
-    inputRef.current?.focus();
-    showToast("순화 문구가 입력창에 채워졌습니다. 수정 후 등록하세요!", "info", 2500);
-  }, [suggestedText, showToast]);
-
-  /** 거절 모달 닫기/확인 시 자동 저장 */
-  const handleRejectConfirmAutoSave = useCallback(async () => {
-    setRejectOpen(false);
-    setProcOpen(true);
-    setProcMsg("임계 초과 — 순화문으로 자동 등록 중…");
-    await saveAsPolite(true);
-  }, [saveAsPolite]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -431,16 +361,31 @@ export default function CommentBox({
         open={politeOpen && !!suggestedText}
         original={originalText}
         polite={suggestedText}
-        onAccept={handleUseAsIs}         
-        onEdit={handleEditThenSubmit}    
+        onAccept={() => saveAsPolite(false)}
+        onEdit={() => {
+          setText(suggestedText);
+          setSecondAttempt(true);
+          setPoliteOpen(false);
+          inputRef.current?.focus();
+          showToast("순화 문구가 입력창에 채워졌습니다. 수정 후 등록하세요!", "info", 2500);
+        }}
         onCancel={() => setPoliteOpen(false)}
       />
 
-      {/* 임계 초과 안내: 여기서 확인/닫기 → 자동 저장 */}
       <RejectEditModal
         open={rejectOpen}
-        onClose={handleRejectConfirmAutoSave}
-        onConfirm={handleRejectConfirmAutoSave}
+        onClose={async () => {
+          setRejectOpen(false);
+          setProcOpen(true);
+          setProcMsg("임계 초과 — 순화문으로 자동 등록 중…");
+          await saveAsPolite(true);
+        }}
+        onConfirm={async () => {
+          setRejectOpen(false);
+          setProcOpen(true);
+          setProcMsg("임계 초과 — 순화문으로 자동 등록 중…");
+          await saveAsPolite(true);
+        }}
         original={originalText}
         userEdit={lastEvaluatedEditTextRef.current || ""}
         polite={suggestedText}
