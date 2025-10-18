@@ -326,6 +326,76 @@ export default function CommentBox({
     policyMode,
   ]);
 
+  const saveAsPolite = React.useCallback(
+    async (auto = false) => {
+      if (submitting) return;
+  
+      try {
+        setSubmitting(true);
+        setProcOpen(true);
+        setProcMsg(auto ? "임계 초과 — 순화문으로 자동 등록 중…" : "순화문으로 등록 중…");
+  
+        const res = await saveComment({
+          user_id: userId,
+          post_id: postId,
+          section,
+          text_original: originalText,         
+          generated_polite_text: suggestedText, // 순화문 포함
+          ...(auto && lastEvaluatedEditTextRef.current
+            ? { text_user_edit: lastEvaluatedEditTextRef.current }
+            : {}),
+          parent_comment_id: replyTo || undefined,
+        });
+  
+        if (!res?.saved) {
+          setProcOpen(false);
+          showToast("저장에 실패했습니다. 다시 시도해주세요.", "error");
+          return;
+        }
+  
+        // 로깅 (연구용)
+        await logInterventionEvent({
+          user_id: userId,
+          post_id: postId,
+          article_ord: section,
+          temp_uuid: flowUuidRef.current,
+          attempt_no: auto ? 2 : 1,
+          original_logit: originalLogit ?? 0.0,
+          edit_logit: auto ? (lastEditLogitRef.current ?? null) : null,
+          threshold_applied: Number(threshold ?? 0),
+          generated_polite_text: suggestedText,
+          user_edit_text: auto ? (lastEvaluatedEditTextRef.current || "") : undefined,
+          decision_rule_applied: "forced_accept_one_edit",
+          final_choice_hint: "polite", 
+          latency_ms: Math.round(performance.now() - (t0Ref.current || performance.now())),
+        });
+  
+        setProcOpen(false);
+        setPoliteOpen(false);
+  
+        await afterSuccess(res, "순화문으로 등록되었습니다!");
+      } catch (e) {
+        setProcOpen(false);
+        showToast(e.message || "등록 중 오류가 발생했습니다.", "error");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [
+      submitting,
+      userId,
+      postId,
+      section,
+      originalText,
+      suggestedText,
+      replyTo,
+      originalLogit,
+      threshold,
+      afterSuccess,
+      showToast,
+    ]
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <textarea
